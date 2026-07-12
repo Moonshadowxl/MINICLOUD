@@ -109,6 +109,7 @@ export async function uploadFiles(
       i++;
     }
     const form = new FormData();
+    form.append('mtimes', JSON.stringify(Object.fromEntries(batch.map((f) => [f.relPath, f.file.lastModified]))));
     for (const f of batch) form.append('f', f.file, encodeURIComponent(f.relPath));
     const qs = new URLSearchParams({ base: basePath, ...(opts.category ? { category: opts.category } : {}) });
     await api(`/files/batch?${qs}`, { method: 'POST', body: form });

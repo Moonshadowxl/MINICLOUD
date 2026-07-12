@@ -29,6 +29,12 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
     return { entries: storage.list(req.userId, path).map(pub) };
   });
 
+  /** Recursive listing of a subtree — one request instead of one per folder (sync agent). */
+  app.get('/files/tree', { preHandler: requireAuth }, async (req) => {
+    const { path = '' } = req.query as { path?: string };
+    return { entries: storage.descendants(req.userId, path).map(pub) };
+  });
+
   app.get('/files/stat', { preHandler: requireAuth }, async (req) => {
     const { path = '' } = req.query as { path?: string };
     const f = storage.stat(req.userId, path);
@@ -55,13 +61,19 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
     const { base = '', category } = req.query as { base?: string; category?: Category };
     const basePath = base ? normPath(base) : '';
     const saved: string[] = [];
+    let mtimes: Record<string, number> = {};
     for await (const part of req.parts()) {
+      if (part.type === 'field' && part.fieldname === 'mtimes') {
+        // optional first field: { "<relPath>": <epoch ms>, ... } so sync stays idempotent
+        try { mtimes = JSON.parse(String(part.value)); } catch { /* ignore bad map */ }
+        continue;
+      }
       if (part.type !== 'file') continue;
       const rel = normPath(decodeURIComponent(part.filename ?? ''));
       if (!rel) throw new StorageError(400, 'file part missing a path');
       const content = await part.toBuffer();
       const full = basePath ? `${basePath}/${rel}` : rel;
-      await storage.writeFile(req.userId, full, content, { category });
+      await storage.writeFile(req.userId, full, content, { category, mtime: mtimes[rel] });
       saved.push(full);
     }
     await storage.cleanupStaleBlobs(req.userId);

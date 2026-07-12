@@ -401,7 +401,7 @@ export class Storage {
       .prepare(
         `SELECT * FROM files WHERE user_id = ? AND deleted_at IS NULL AND path LIKE ? ORDER BY path`,
       )
-      .all(userId, `${p}/%`) as unknown as FileRow[];
+      .all(userId, p ? `${p}/%` : '%') as unknown as FileRow[];
   }
 
   move(userId: string, fromRaw: string, toRaw: string): void {
