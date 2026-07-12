@@ -1,0 +1,22 @@
+{
+  "name": "minicloud",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Your personal 24/7 cloud — store files, apps and whole codebases, stream media, and serve web apps from your own machine.",
+  "workspaces": [
+    "server",
+    "web",
+    "agent"
+  ],
+  "scripts": {
+    "setup": "npm run setup -w server",
+    "dev": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w web && npm run build -w server",
+    "start": "npm run start -w server",
+    "test": "npm run test -w server"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

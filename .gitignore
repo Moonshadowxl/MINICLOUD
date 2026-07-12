@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+*.log
+.DS_Store
+
+# MiniCloud runtime data — never commit user files or keys
+data/
+*.key
+
+.env
+.env.*
