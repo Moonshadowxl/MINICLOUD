@@ -7,6 +7,7 @@ build/
 # MiniCloud runtime data — never commit user files or keys
 data/
 *.key
+e2e-shots/
 
 .env
 .env.*

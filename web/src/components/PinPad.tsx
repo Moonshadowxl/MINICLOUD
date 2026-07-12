@@ -20,19 +20,17 @@ export default function PinPad({ onSubmit, length = 4 }: {
 
   // submit at 4 digits automatically after a short pause, or at 6 immediately
   useEffect(() => {
-    if (pin.length < length) return;
+    if (pin.length < length || busy) return;
     const wait = pin.length >= 6 ? 0 : 350;
     const t = setTimeout(async () => {
       setBusy(true);
       const ok = await onSubmit(pin);
+      setPin(''); // always clear: prevents re-render loops from resubmitting the same PIN
       setBusy(false);
-      if (!ok) {
-        setError(true);
-        setPin('');
-      }
+      if (!ok) setError(true);
     }, wait);
     return () => clearTimeout(t);
-  }, [pin, length, onSubmit]);
+  }, [pin, length, busy, onSubmit]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

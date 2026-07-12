@@ -25,7 +25,10 @@ export default function Welcome() {
   });
   useEffect(() => { load().catch(() => undefined); }, []);
 
+  const finishing = useRef(false);
   const finish = (user: PublicUser) => {
+    if (finishing.current) return; // one splash, one timer — no stale setUser later
+    finishing.current = true;
     setGreeting(greetingFor(user.displayName));
     // let the splash play, then enter the app
     setTimeout(() => setUser(user), 1750);

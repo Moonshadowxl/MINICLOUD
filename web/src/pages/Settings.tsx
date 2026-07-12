@@ -64,6 +64,17 @@ function SecurityPanel() {
         </div>
         <button className="btn btn-ghost btn-sm" disabled={!pin.current}>Update PIN</button>
       </form>
+
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+        <button className="btn btn-danger btn-sm" onClick={async () => {
+          if (!confirm('Forget this device? PIN unlock stops working here until you sign in with your password again.')) return;
+          await api('/auth/forget-device', { method: 'POST' });
+          location.href = '/';
+        }}>Forget this device</button>
+        <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)', margin: '8px 0 0' }}>
+          Removes this device's trusted status — do this on shared or borrowed computers.
+        </p>
+      </div>
     </section>
   );
 }
