@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { api, type Entry, type ServedApp } from '../api';
 import { CHAMBERS } from '../accession';
 import { useToast } from '../state';
+import { useSheet } from '../useSheet';
 import {
-  AlarmIcon, ArchiveIcon, CloseIcon, CopyIcon, IssueIcon, OpenWorldIcon, SealIcon, ShelfIcon, UpIcon,
+  AlarmIcon, ArchiveIcon, CheckIcon, CloseIcon, CopyIcon, IntoIcon, IssueIcon, OpenWorldIcon,
+  SealIcon, ShelfIcon, UpIcon,
 } from '../components/Icons';
 
 /**
@@ -20,6 +22,7 @@ export default function Launch() {
   useEffect(() => { load(); }, []);
 
   const recall = async (a: ServedApp) => {
+    if (!confirm(`Return "${a.name}" to the shelf? Its links stop working. The files are kept.`)) return;
     await api(`/apps/${a.id}`, { method: 'DELETE' });
     toast(`${a.name} is back on the shelf — files kept`);
     load();
@@ -122,18 +125,13 @@ function IssueSheet({ onClose, onDone }: { onClose: () => void; onDone: () => vo
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
+  const sheet = useSheet(onClose);
 
   useEffect(() => {
     api<{ entries: Entry[] }>(`/files?path=${encodeURIComponent(browsePath)}`)
       .then((r) => setEntries(r.entries.filter((e) => e.isDir || e.mime === 'text/html')))
       .catch(() => setEntries([]));
   }, [browsePath]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   const submit = async () => {
     setBusy(true);
@@ -153,7 +151,7 @@ function IssueSheet({ onClose, onDone }: { onClose: () => void; onDone: () => vo
 
   return (
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="Issue an accession">
+      <div ref={sheet} className="sheet" role="dialog" aria-modal="true" aria-label="Issue an accession">
         <div className="sheet-head">
           <div className="titling">
             <h3>Issue an accession</h3>
@@ -167,37 +165,42 @@ function IssueSheet({ onClose, onDone }: { onClose: () => void; onDone: () => vo
             <label>What should be served{browsePath && <> — in {browsePath}</>}</label>
             <div className="picker">
               {browsePath && (
-                <button className="pick" onClick={() => setBrowsePath(browsePath.split('/').slice(0, -1).join('/'))}>
-                  <UpIcon size={15} />
-                  <span className="pn">Up one shelf</span>
-                </button>
+                <div className="pick">
+                  <button type="button" className="pick-take" onClick={() => setBrowsePath(browsePath.split('/').slice(0, -1).join('/'))}>
+                    <UpIcon size={15} />
+                    <span className="pn">Up one shelf</span>
+                  </button>
+                </div>
               )}
               {entries.map((e) => (
-                <button
-                  key={e.id}
-                  className={`pick${path === e.path ? ' on' : ''}`}
-                  onClick={() => {
-                    setPath(e.path);
-                    if (!name) {
-                      setName(e.name.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, ''));
-                    }
-                  }}
-                  onDoubleClick={() => e.isDir && setBrowsePath(e.path)}
-                >
-                  {e.isDir ? <ShelfIcon size={15} /> : <OpenWorldIcon size={15} />}
-                  <span className="pn">{e.name}</span>
+                <div className={`pick${path === e.path ? ' on' : ''}`} key={e.id}>
+                  <button
+                    type="button"
+                    className="pick-take"
+                    aria-pressed={path === e.path}
+                    onClick={() => {
+                      setPath(e.path);
+                      if (!name) {
+                        setName(e.name.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, ''));
+                      }
+                    }}
+                  >
+                    {e.isDir ? <ShelfIcon size={15} /> : <OpenWorldIcon size={15} />}
+                    <span className="pn">{e.name}</span>
+                    {path === e.path && <CheckIcon size={15} />}
+                  </button>
                   {e.isDir && (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      className="reg reg-sm"
-                      onClick={(ev) => { ev.stopPropagation(); setBrowsePath(e.path); }}
-                      onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); setBrowsePath(e.path); } }}
+                    <button
+                      type="button"
+                      className="pick-into"
+                      onClick={() => setBrowsePath(e.path)}
+                      aria-label={`Open the ${e.name} shelf`}
+                      title="Open this shelf"
                     >
-                      Open
-                    </span>
+                      <IntoIcon size={16} />
+                    </button>
                   )}
-                </button>
+                </div>
               ))}
               {entries.length === 0 && (
                 <div style={{ padding: 14, color: 'var(--rime-3)', fontSize: '0.84rem' }}>
@@ -220,14 +223,16 @@ function IssueSheet({ onClose, onDone }: { onClose: () => void; onDone: () => vo
             <div className="choice">
               <button
                 type="button"
-                className={`btn btn-sm ${visibility === 'private' ? 'btn-portal' : 'btn-quiet'}`}
+                aria-pressed={visibility === 'private'}
+                className={`btn btn-sm seg${visibility === 'private' ? ' on' : ''}`}
                 onClick={() => setVisibility('private')}
               >
                 <ArchiveIcon size={14} /> Held
               </button>
               <button
                 type="button"
-                className={`btn btn-sm ${visibility === 'public' ? 'btn-portal' : 'btn-quiet'}`}
+                aria-pressed={visibility === 'public'}
+                className={`btn btn-sm seg open${visibility === 'public' ? ' on' : ''}`}
                 onClick={() => setVisibility('public')}
               >
                 <OpenWorldIcon size={14} /> Issued

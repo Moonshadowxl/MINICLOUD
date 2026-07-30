@@ -19,7 +19,7 @@ export default function Welcome() {
   const [data, setData] = useState<ProfilesResp | null>(null);
   const [selected, setSelected] = useState<PublicUser | null>(null);
   const [mode, setMode] = useState<'pick' | 'pin' | 'password' | 'setup' | 'add'>('pick');
-  const [admitted, setAdmitted] = useState<{ title: string; sub: string } | null>(null);
+  const [admitted, setAdmitted] = useState<{ sub: string } | null>(null);
   const night = isNight();
 
   const load = () => api<ProfilesResp>('/auth/profiles').then((d) => {
@@ -32,8 +32,12 @@ export default function Welcome() {
   const finish = (user: PublicUser) => {
     if (finishing.current) return; // one admission, one timer — no stale setUser later
     finishing.current = true;
-    setAdmitted(greetingFor(user.displayName));
-    setTimeout(() => setUser(user), 1750);
+    setAdmitted({ sub: greetingFor(user.displayName).sub });
+    // short, and skippable: the greeting itself belongs to the chamber, not to a splash
+    const t = setTimeout(() => setUser(user), 950);
+    const skip = () => { clearTimeout(t); setUser(user); };
+    window.addEventListener('keydown', skip, { once: true });
+    window.addEventListener('pointerdown', skip, { once: true });
   };
 
   const pick = (p: PublicUser) => {
@@ -118,9 +122,8 @@ export default function Welcome() {
           <div className="admit-inner">
             <span className="line">
               <span className="lamp" />
-              <span className="reg reg-sm num">Admitted {clock} · chamber open</span>
+              <span className="reg num">Admitted {clock} · chamber open</span>
             </span>
-            <h1>{admitted.title}</h1>
             <span className="sub">{admitted.sub}</span>
           </div>
         </div>

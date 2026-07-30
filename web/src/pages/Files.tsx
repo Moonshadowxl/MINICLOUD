@@ -4,9 +4,10 @@ import { api, fmtBytes, uploadFiles, type Entry, type UploadProgress } from '../
 import { CHAMBERS, accession } from '../accession';
 import { useToast } from '../state';
 import Viewer from '../components/Viewer';
+import { useSheet } from '../useSheet';
 import {
-  ArchiveIcon, DepositIcon, NewShelfIcon, RelabelIcon, ShelfIcon, ThawIcon, WithdrawIcon,
-  formMark,
+  AlarmIcon, ArchiveIcon, CheckIcon, CloseIcon, DepositIcon, NewShelfIcon, RelabelIcon,
+  ShelfIcon, ThawIcon, WithdrawIcon, formMark,
 } from '../components/Icons';
 
 const when = (t: number | null, created: number) => {
@@ -27,6 +28,9 @@ export default function Files() {
   const [uploads, setUploads] = useState<UploadProgress[]>([]);
   const [viewing, setViewing] = useState<Entry | null>(null);
   const [dragOver, setDragOver] = useState(0);
+  const [filter, setFilter] = useState('');
+  const [renaming, setRenaming] = useState<Entry | null>(null);
+  const [naming, setNaming] = useState(false);
   const toast = useToast();
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
@@ -105,12 +109,19 @@ export default function Files() {
 
   const thaw = async (entry: Entry) => {
     await api(`/files/${entry.id}`, { method: 'DELETE' });
-    toast(`${entry.name} moved to the thaw shelf`);
+    // the thaw shelf keeps it for 30 days, so undo costs one call
+    toast(`${entry.name} moved to the thaw shelf`, false, {
+      label: 'Undo',
+      run: async () => {
+        await api(`/files/${entry.id}/restore`, { method: 'POST' });
+        load();
+      },
+    });
     load();
   };
 
-  const relabel = async (entry: Entry) => {
-    const name = prompt('New label', entry.name);
+  const relabel = async (entry: Entry, name: string) => {
+    setRenaming(null);
     if (!name || name === entry.name) return;
     const parent = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : '';
     try {
@@ -124,8 +135,8 @@ export default function Files() {
     }
   };
 
-  const newShelf = async () => {
-    const name = prompt('Name the shelf');
+  const newShelf = async (name: string) => {
+    setNaming(false);
     if (!name) return;
     try {
       await api('/files/mkdir', { method: 'POST', body: JSON.stringify({ path: path ? `${path}/${name}` : name }) });
@@ -134,6 +145,10 @@ export default function Files() {
   };
 
   const crumbs = path ? path.split('/') : [];
+  const q = filter.trim().toLowerCase();
+  const shown = (entries ?? []).filter(
+    (e) => !q || e.name.toLowerCase().includes(q) || accession(e.id, e.category).toLowerCase().includes(q),
+  );
 
   return (
     <div
@@ -157,7 +172,7 @@ export default function Files() {
           </nav>
         </div>
         <div className="acts">
-          <button className="btn btn-quiet btn-sm" onClick={newShelf}>
+          <button className="btn btn-quiet btn-sm" onClick={() => setNaming(true)}>
             <NewShelfIcon size={14} /> New shelf
           </button>
           <button className="btn btn-quiet btn-sm" onClick={() => folderInput.current?.click()}>
@@ -168,6 +183,21 @@ export default function Files() {
           </button>
         </div>
       </div>
+
+      {entries !== null && entries.length > 0 && (
+        <div className="sift">
+          <label className="reg reg-sm" htmlFor="sift">Find on this shelf</label>
+          <input
+            id="sift"
+            className="input"
+            type="search"
+            value={filter}
+            placeholder="Name or accession code"
+            onChange={(ev) => setFilter(ev.target.value)}
+          />
+          {q && <span className="reg reg-sm num">{shown.length} of {entries.length}</span>}
+        </div>
+      )}
 
       <input ref={fileInput} type="file" multiple hidden onChange={(e) => { onPickFiles(e.target.files); e.target.value = ''; }} />
       {/* @ts-expect-error webkitdirectory is non-standard but universal */}
@@ -209,20 +239,30 @@ export default function Files() {
             <span />
             <span>Description</span>
             <span>Accession</span>
-            <span>Mass</span>
+            <span>Size</span>
             <span>Deposited</span>
             <span />
           </div>
-          {entries.map((e) => (
+          {shown.length === 0 && (
+            <div className="bare" style={{ padding: '44px 20px' }}>
+              <h3>Nothing on this shelf matches “{filter}”</h3>
+              <p className="fine">Shelves are searched one at a time — try a shelf above.</p>
+            </div>
+          )}
+          {shown.map((e) => (
             <div className="entry" key={e.id}>
               <span className="form-ico">{formMark(e)}</span>
               <div className="desc">
-                <button
-                  className="desc-name"
-                  onClick={() => (e.isDir ? go(e.path) : setViewing(e))}
-                >
-                  {e.name}
-                </button>
+                {renaming?.id === e.id ? (
+                  <Relabel entry={e} onDone={(name) => relabel(e, name)} onCancel={() => setRenaming(null)} />
+                ) : (
+                  <button
+                    className="desc-name"
+                    onClick={() => (e.isDir ? go(e.path) : setViewing(e))}
+                  >
+                    {e.name}
+                  </button>
+                )}
               </div>
               <span className="acc num">{e.isDir ? 'Shelf' : accession(e.id, e.category)}</span>
               <span className="mass num">{e.isDir ? '—' : fmtBytes(e.size)}</span>
@@ -237,7 +277,7 @@ export default function Files() {
                 >
                   <WithdrawIcon size={15} />
                 </a>
-                <button className="icon-btn" onClick={() => relabel(e)} aria-label={`Relabel ${e.name}`} title="Relabel">
+                <button className="icon-btn" onClick={() => setRenaming(e)} aria-label={`Relabel ${e.name}`} title="Relabel">
                   <RelabelIcon size={15} />
                 </button>
                 <button className="icon-btn danger" onClick={() => thaw(e)} aria-label={`Move ${e.name} to the thaw shelf`} title="Move to thaw shelf">
@@ -275,7 +315,71 @@ export default function Files() {
         </div>
       )}
 
+      {naming && <NameSheet onDone={newShelf} onCancel={() => setNaming(false)} />}
       {viewing && <Viewer entry={viewing} onClose={() => setViewing(null)} />}
+    </div>
+  );
+}
+
+/** Relabelling happens on the row itself — the register never hands you off to an OS dialog. */
+function Relabel({ entry, onDone, onCancel }: {
+  entry: Entry; onDone: (name: string) => void; onCancel: () => void;
+}) {
+  const [v, setV] = useState(entry.name);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
+  return (
+    <form
+      className="relabel"
+      onSubmit={(e) => { e.preventDefault(); onDone(v.trim()); }}
+    >
+      <input
+        ref={ref}
+        className="input"
+        value={v}
+        aria-label={`New label for ${entry.name}`}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && onCancel()}
+      />
+      <button className="icon-btn" type="submit" aria-label="Save the new label"><CheckIcon size={15} /></button>
+      <button className="icon-btn" type="button" onClick={onCancel} aria-label="Keep the old label"><CloseIcon size={15} /></button>
+    </form>
+  );
+}
+
+/** Naming a shelf is a small, focused step — a plate, not a browser prompt. */
+function NameSheet({ onDone, onCancel }: { onDone: (name: string) => void; onCancel: () => void }) {
+  const [v, setV] = useState('');
+  const sheet = useSheet<HTMLFormElement>(onCancel);
+  return (
+    <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <form
+        ref={sheet}
+        className="sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Name the shelf"
+        style={{ maxWidth: 400 }}
+        onSubmit={(e) => { e.preventDefault(); onDone(v.trim()); }}
+      >
+        <div className="sheet-head">
+          <div className="titling">
+            <h3>New shelf</h3>
+            <span className="reg reg-sm">It is cut inside the shelf you are on</span>
+          </div>
+        </div>
+        <div className="sheet-body">
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label htmlFor="shelf-name">Name</label>
+            <input id="shelf-name" className="input" value={v} autoFocus
+              onChange={(e) => setV(e.target.value)} />
+          </div>
+        </div>
+        <div className="sheet-foot">
+          <button type="button" className="btn btn-quiet" onClick={onCancel}>Cancel</button>
+          <button className="btn btn-portal" disabled={!v.trim()}>Cut the shelf</button>
+        </div>
+      </form>
     </div>
   );
 }

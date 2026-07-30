@@ -8,10 +8,10 @@ import { ArchiveIcon, IssueIcon, OpenWorldIcon } from '../components/Icons';
 
 /** Box labels: colour AND a band pattern, so colour is never the only signal. */
 const LABELS = [
-  { key: 'files', name: 'Files', color: 'var(--lbl-files)', band: 'none' },
-  { key: 'media', name: 'Media', color: 'var(--lbl-media)', band: 'repeating-linear-gradient(90deg, oklch(0.13 0.016 250 / 0.55) 0 2px, transparent 2px 4px)' },
-  { key: 'projects', name: 'Projects', color: 'var(--lbl-projects)', band: 'radial-gradient(circle at 1px 1.5px, oklch(0.13 0.016 250 / 0.6) 0.9px, transparent 1px)' },
-  { key: 'apps', name: 'Apps', color: 'var(--lbl-apps)', band: 'repeating-linear-gradient(45deg, oklch(0.13 0.016 250 / 0.5) 0 1.5px, transparent 1.5px 3.5px)' },
+  { key: 'files', name: 'Files', shelf: '', color: 'var(--lbl-files)', band: 'none' },
+  { key: 'media', name: 'Media', shelf: 'media', color: 'var(--lbl-media)', band: 'repeating-linear-gradient(90deg, oklch(0.13 0.016 250 / 0.55) 0 2px, transparent 2px 4px)' },
+  { key: 'projects', name: 'Projects', shelf: 'projects', color: 'var(--lbl-projects)', band: 'radial-gradient(circle at 1px 1.5px, oklch(0.13 0.016 250 / 0.6) 0.9px, transparent 1px)' },
+  { key: 'apps', name: 'Apps', shelf: 'apps', color: 'var(--lbl-apps)', band: 'repeating-linear-gradient(45deg, oklch(0.13 0.016 250 / 0.5) 0 1.5px, transparent 1.5px 3.5px)' },
 ] as const;
 
 const COLS = 12;
@@ -20,8 +20,8 @@ const SLOTS = COLS * ROWS;
 
 /**
  * CH·01 — the rack elevation. Every slot on the shelving is 1/60th of the pool, so how
- * full the vault is can be counted rather than estimated off a curve. Boxes are laid in
- * by category, in the order of the key beside them.
+ * full the vault is can be counted rather than estimated off a curve. Each run of crates
+ * is also the way into the shelf it stands for, so the reading is the navigation.
  */
 export default function Home() {
   const { user } = useSession();
@@ -42,6 +42,7 @@ export default function Home() {
   }, []);
 
   const greeting = greetingFor(user!.displayName);
+  const total = usage ? Math.max(1, LABELS.reduce((n, l) => n + (usage.breakdown[l.key] ?? 0), 0)) : 1;
 
   return (
     <>
@@ -52,51 +53,34 @@ export default function Home() {
         </div>
       </div>
 
+      {/* The rack is the reading AND the way in: each run of crates is the shelf it stands
+          for, and the condition band above already carries the totals, so nothing is
+          restated here. */}
       <section aria-label="Rack occupancy" style={{ marginBottom: 34 }}>
-        <div className="rack-wrap">
-          <div>
-            {usage ? (
-              <>
-                <div className="rack-reading">
-                  <span className="rack-figure">{fmtBytes(usage.used)}</span>
-                  <span className="rack-of">sealed of {fmtBytes(usage.quota)}</span>
-                </div>
-                <Rack usage={usage} />
-                <p className="reg" style={{ marginTop: 12, letterSpacing: '0.1em' }}>
-                  One slot = {fmtBytes(usage.quota / SLOTS)} · {fmtBytes(Math.max(0, usage.quota - usage.used))} still free
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="frosted" style={{ width: 300, height: 52, marginBottom: 16 }} />
-                <div className="frosted" style={{ height: 210 }} />
-              </>
-            )}
-          </div>
-
-          <div className="panel sealed">
-            <div className="panel-head"><span className="reg">Box labels</span></div>
-            <div className="panel-body" style={{ paddingTop: 4, paddingBottom: 6 }}>
-              <div className="key-list">
-                {LABELS.map((l) => (
-                  <div className="key-row" key={l.key}>
-                    <span
-                      className="key-swatch"
-                      style={{ background: l.color, ['--slot-band' as string]: l.band }}
-                    />
-                    <span className="n">{l.name}</span>
-                    <span className="q num">{usage ? fmtBytes(usage.breakdown[l.key] ?? 0) : '—'}</span>
-                  </div>
-                ))}
-                <div className="key-row">
-                  <span className="key-swatch" style={{ background: 'transparent', border: '1px solid var(--edge-bright)' }} />
-                  <span className="n">Thaw shelf</span>
-                  <span className="q num">{usage ? fmtBytes(usage.trashBytes) : '—'}</span>
-                </div>
-              </div>
+        {usage ? (
+          <>
+            <Rack usage={usage} />
+            <div className="rack-key">
+              {LABELS.map((l) => {
+                const bytes = usage.breakdown[l.key] ?? 0;
+                return (
+                  <Link className="run" to={`/files/${l.shelf}`} key={l.key}>
+                    <span className="run-swatch" style={{ background: l.color, ['--slot-band' as string]: l.band }} />
+                    <span className="run-name">{l.name}</span>
+                    <span className="run-q num">{fmtBytes(bytes)}</span>
+                    <span className="run-share num">{Math.round((bytes / total) * 100)}%</span>
+                  </Link>
+                );
+              })}
             </div>
-          </div>
-        </div>
+            <p className="reg" style={{ marginTop: 14, letterSpacing: '0.1em' }}>
+              One crate = {fmtBytes(usage.quota / SLOTS)}
+              {usage.trashBytes > 0 && <> · {fmtBytes(usage.trashBytes)} waiting on the thaw shelf</>}
+            </p>
+          </>
+        ) : (
+          <div className="frosted" style={{ height: 300 }} />
+        )}
       </section>
 
       <section className="panel" aria-label="Issued to the open">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fmtBytes, type Entry } from '../api';
 import { accession } from '../accession';
+import { useSheet } from '../useSheet';
 import { CloseIcon, WithdrawIcon } from './Icons';
 
 const TEXT_EXT = new Set([
@@ -20,17 +21,12 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
   const src = `/api/files/${entry.id}/content`;
   const [text, setText] = useState<string | null>(null);
   const [tooBig, setTooBig] = useState(false);
+  const sheet = useSheet(onClose);
 
   const kind = entry.mime.startsWith('video/') ? 'video'
     : entry.mime.startsWith('audio/') ? 'audio'
     : entry.mime.startsWith('image/') ? 'image'
     : isText(entry) ? 'text' : 'other';
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   useEffect(() => {
     if (kind !== 'text') return;
@@ -41,6 +37,7 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
   return (
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div
+        ref={sheet}
         className={`sheet${kind === 'video' || kind === 'text' ? ' wide' : ''}`}
         role="dialog"
         aria-modal="true"
@@ -66,7 +63,7 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
             {kind === 'text' && (
               tooBig ? (
                 <p className="view-note">
-                  Too large to read in the chamber. <a href={`${src}?download`} download>Withdraw a copy</a> instead.
+                  Too large to read in the chamber. <a href={`${src}?download`} download>Download it</a> instead.
                 </p>
               ) : text === null ? (
                 <div className="frosted" style={{ height: 220 }} />
@@ -79,17 +76,17 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
             {kind === 'other' && (
               <p className="view-note">
                 Nothing in the chamber reads this form.{' '}
-                <a href={`${src}?download`} download>Withdraw a copy</a> to open it on your own machine.
+                <a href={`${src}?download`} download>Download it</a> to open it on your own machine.
               </p>
             )}
           </div>
         </div>
 
         <div className="sheet-foot">
-          <a className="btn btn-quiet" href={`${src}?download`} download={entry.name}>
-            <WithdrawIcon size={15} /> Withdraw a copy
+          <button className="btn btn-quiet" onClick={onClose}>Close</button>
+          <a className="btn btn-portal" href={`${src}?download`} download={entry.name}>
+            <WithdrawIcon size={15} /> Download
           </a>
-          <button className="btn btn-portal" onClick={onClose}>Back to the register</button>
         </div>
       </div>
     </div>

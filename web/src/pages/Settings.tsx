@@ -20,7 +20,7 @@ export default function Settings() {
       </div>
 
       <div className="clauses">
-        <Clause no="01" title="The master key" note="Read this one" critical>
+        <Clause title="The master key" note="Read this one" critical>
           <div className="clause-cols">
             <div>
               <p>
@@ -49,25 +49,25 @@ export default function Settings() {
           </div>
         </Clause>
 
-        <Clause no="02" title="Your way in" note="Password and quick code">
+        <Clause title="Your way in" note="Password, and the quick code for your PIN">
           <SecurityClause />
         </Clause>
 
-        <Clause no="03" title="This device" note="Trust, and how to withdraw it">
+        <Clause title="This device" note="Trust, and how to withdraw it">
           <DeviceClause />
         </Clause>
 
         {user?.isOwner && (
-          <Clause no="04" title="Depositors" note="Who else holds a chamber">
+          <Clause title="Depositors" note="Who else holds a chamber">
             <DepositorsClause />
           </Clause>
         )}
 
-        <Clause no={user?.isOwner ? '05' : '04'} title="The thaw shelf" note="Removed, not yet gone">
+        <Clause title="The thaw shelf" note="Removed, not yet gone">
           <ThawClause />
         </Clause>
 
-        <Clause no={user?.isOwner ? '06' : '05'} title="Reaching the vault" note="From outside the house">
+        <Clause title="Reaching the vault" note="From outside the house">
           <p>
             MiniCloud runs on your own machine, so it answers on your own network by default. To
             reach it from anywhere, install <a href="https://tailscale.com" target="_blank" rel="noreferrer">Tailscale</a> on
@@ -84,13 +84,12 @@ export default function Settings() {
   );
 }
 
-function Clause({ no, title, note, critical, children }: {
-  no: string; title: string; note: string; critical?: boolean; children: ReactNode;
+function Clause({ title, note, critical, children }: {
+  title: string; note: string; critical?: boolean; children: ReactNode;
 }) {
   return (
     <section className={`clause${critical ? ' critical' : ''}`}>
       <div className="clause-head">
-        <span className="clause-no">{no}</span>
         <div className="clause-title">
           <h3>{title}</h3>
           <span className="reg reg-sm">{note}</span>
@@ -161,7 +160,7 @@ function SecurityClause() {
 
 function DeviceClause() {
   return (
-    <div className="clause-cols">
+    <div className="clause-split">
       <p style={{ margin: 0 }}>
         Signing in with your password marks this device as trusted, which is what lets the quick
         code work here. Forgetting the device undoes that: the code stops working until you sign

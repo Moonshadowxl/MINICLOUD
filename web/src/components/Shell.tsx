@@ -71,8 +71,9 @@ export default function Shell() {
       </aside>
 
       <div className="chamber">
-        <div className="conditions" role="status" aria-label="Chamber conditions">
-          <Cond label="Chamber">
+        <div className="conditions" aria-label="Chamber conditions">
+          {/* only fullness is worth interrupting a screen reader for; the clock is not */}
+          <Cond label="Chamber" live>
             <span className={`lamp ${state}`} />
             {usage ? `${Math.round(pct)}% full` : '—'}
           </Cond>
@@ -97,11 +98,13 @@ export default function Shell() {
   );
 }
 
-function Cond({ label, children, push }: { label: string; children: ReactNode; push?: boolean }) {
+function Cond({ label, children, push, live }: {
+  label: string; children: ReactNode; push?: boolean; live?: boolean;
+}) {
   return (
     <div className={`cond${push ? ' push' : ''}`}>
       <span className="reg reg-sm">{label}</span>
-      <span className="v">{children}</span>
+      <span className="v" aria-live={live ? 'polite' : 'off'}>{children}</span>
     </div>
   );
 }

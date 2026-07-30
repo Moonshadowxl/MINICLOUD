@@ -72,7 +72,8 @@
   --z-log: 60;
 
   font-family: Archivo, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  font-size: 14px;
+  /* the browser default, so a raised system font size still applies; the vault is read
+     across a room and in daylight, and 14px root put the stencil labels under 9px */
   font-synthesis-weight: none;
   color: var(--rime);
   background: var(--rock);
@@ -96,11 +97,11 @@ body {
   font-stretch: 68%;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.75rem;
+  letter-spacing: 0.13em;
+  font-size: 0.8rem;   /* 12.8px — stencil labels never go below ~11px */
   color: var(--rime-3);
 }
-.reg-sm { font-size: 0.66rem; letter-spacing: 0.16em; }
+.reg-sm { font-size: 0.72rem; letter-spacing: 0.14em; }
 
 h1, h2, h3, h4 {
   margin: 0;
@@ -183,7 +184,15 @@ code {
 }
 .btn:hover:not(:disabled) { background: var(--chamber-3); border-color: var(--rime-3); }
 .btn:active:not(:disabled) { background: var(--chamber); }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* disabled is designed, not faded away: the plate keeps its edge so the control is still
+   findable, only the fill and the label drop */
+.btn:disabled {
+  cursor: not-allowed;
+  background: transparent;
+  border-color: var(--edge);
+  color: var(--rime-3);
+  box-shadow: none;
+}
 
 .btn-portal {
   background: var(--portal);
@@ -204,7 +213,7 @@ code {
 .btn-alarm { background: transparent; border-color: oklch(0.45 0.11 25); color: var(--alarm); }
 .btn-alarm:hover:not(:disabled) { background: var(--alarm-wash); border-color: var(--alarm); color: var(--alarm); }
 
-.btn-sm { padding: 5px 10px; font-size: 0.68rem; letter-spacing: 0.1em; }
+.btn-sm { padding: 6px 11px; font-size: 0.74rem; letter-spacing: 0.1em; }
 .btn svg { flex-shrink: 0; }
 
 /* ---------------- inputs ---------------- */
@@ -383,7 +392,7 @@ code {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.plate-code { font-size: 0.62rem; letter-spacing: 0.14em; color: var(--rime-3); font-stretch: 68%; font-weight: 600; }
+.plate-code { font-size: 0.72rem; letter-spacing: 0.14em; color: var(--rime-3); font-stretch: 68%; font-weight: 600; }
 
 .plate:hover .plate-face,
 .plate:focus-visible .plate-face { transform: translateY(-4px); border-color: var(--rime-3); }
@@ -495,10 +504,10 @@ code {
   transition: background 140ms var(--ease), color 140ms var(--ease);
 }
 .chambers a .ch-no {
-  font-stretch: 66%; font-weight: 600; font-size: 0.6rem; letter-spacing: 0.12em;
+  font-stretch: 66%; font-weight: 600; font-size: 0.68rem; letter-spacing: 0.12em;
   color: var(--rime-3); opacity: 0.75; margin-left: auto;
 }
-.chambers a .ch-name { font-stretch: 74%; font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.1em; }
+.chambers a .ch-name { font-stretch: 74%; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; }
 .chambers a:hover { background: var(--chamber); color: var(--rime-2); }
 .chambers a.active { background: var(--chamber-2); color: var(--rime); }
 .chambers a.active .ch-no { color: var(--portal); opacity: 1; }
@@ -526,7 +535,7 @@ code {
 .dep-who .n { font-stretch: 78%; font-weight: 600; font-size: 0.82rem; color: var(--rime); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dep-who button {
   background: none; border: none; padding: 0; cursor: pointer;
-  font: inherit; font-stretch: 68%; font-weight: 600; font-size: 0.62rem;
+  font: inherit; font-stretch: 68%; font-weight: 600; font-size: 0.72rem;
   text-transform: uppercase; letter-spacing: 0.13em; color: var(--rime-3);
 }
 .dep-who button:hover { color: var(--ice); }
@@ -554,7 +563,7 @@ code {
   white-space: nowrap;
   flex-shrink: 0;
 }
-.cond:last-child { border-right: none; }
+.cond:last-child, .cond:nth-last-child(2) { border-right: none; }
 .cond .v {
   font-stretch: 78%; font-weight: 600; font-size: 0.9rem;
   font-variant-numeric: tabular-nums; color: var(--rime);
@@ -708,10 +717,19 @@ code {
 .location button:last-child { color: var(--rime); }
 .location .sep { color: var(--rime-3); user-select: none; font-size: 0.7rem; }
 
-.register { border: 1px solid var(--edge); border-radius: var(--r-panel); overflow: hidden; background: var(--chamber); }
+.register {
+  border: 1px solid var(--edge);
+  border-radius: var(--r-panel);
+  overflow: hidden;
+  background: var(--chamber);
+  /* a row must stay readable as one line: name and its own mass within one saccade */
+  max-width: 940px;
+}
 .register-head, .entry {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 108px 96px 132px auto;
+  /* the name is capped so its own accession, size and date sit within one glance of it;
+     the trailing column absorbs the slack and holds the row actions at the right */
+  grid-template-columns: 34px minmax(0, 20rem) 6.5rem 5rem 7.5rem 1fr;
   align-items: center;
   gap: 14px;
   padding: 0 16px;
@@ -721,7 +739,7 @@ code {
   background: var(--rock-deep);
   border-bottom: 1px solid var(--edge);
 }
-.register-head > span { font-stretch: 68%; font-weight: 600; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--rime-3); }
+.register-head > span { font-stretch: 68%; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--rime-3); }
 .entry {
   min-height: 52px;
   border-bottom: 1px solid var(--edge);
@@ -734,15 +752,15 @@ code {
 .entry:hover .form-ico { color: var(--ice); }
 .entry .desc { min-width: 0; }
 .entry .desc-name {
-  font-size: 0.92rem; font-weight: 500; color: var(--rime);
+  font-size: 0.97rem; font-weight: 500; color: var(--rime);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   background: none; border: none; padding: 0; font-family: inherit; text-align: left;
   cursor: pointer; width: 100%; border-radius: 2px;
 }
 .entry .desc-name:hover { color: var(--ice); }
 .entry .acc, .entry .mass, .entry .when {
-  font-stretch: 72%; font-weight: 500; font-size: 0.74rem;
-  letter-spacing: 0.06em; font-variant-numeric: tabular-nums; color: var(--rime-3);
+  font-stretch: 74%; font-weight: 500; font-size: 0.8rem;
+  letter-spacing: 0.05em; font-variant-numeric: tabular-nums; color: var(--rime-3);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .entry .acc { letter-spacing: 0.1em; }
@@ -765,7 +783,7 @@ code {
 /* --- stamps: issued / held / sealed --- */
 .stamp {
   display: inline-flex; align-items: center; gap: 6px;
-  font-stretch: 68%; font-weight: 600; font-size: 0.62rem;
+  font-stretch: 68%; font-weight: 600; font-size: 0.72rem;
   text-transform: uppercase; letter-spacing: 0.14em;
   padding: 4px 8px;
   border: 1px solid;
@@ -890,23 +908,40 @@ code {
 
 /* --- picker inside the issue sheet --- */
 .picker { border: 1px solid var(--edge); border-radius: var(--r-plate); background: var(--rock-deep); max-height: 208px; overflow-y: auto; }
-.pick {
+.pick { display: flex; align-items: stretch; border-bottom: 1px solid var(--edge); }
+.pick:last-child { border-bottom: none; }
+/* one tap selects; entering a shelf is a separate control at a real touch size */
+.pick-take, .pick-into {
   display: flex; align-items: center; gap: 10px;
-  width: 100%;
-  padding: 9px 12px;
-  background: none; border: none; border-bottom: 1px solid var(--edge);
-  font: inherit; font-size: 0.86rem; color: var(--rime-2);
+  padding: 11px 12px;
+  min-height: 44px;
+  background: none; border: none;
+  font: inherit; font-size: 0.9rem; color: var(--rime-2);
   cursor: pointer; text-align: left;
 }
-.pick:last-child { border-bottom: none; }
-.pick:hover { background: var(--chamber-2); color: var(--rime); }
-.pick.on { background: var(--portal-wash); color: var(--rime); }
+.pick-take { flex: 1; min-width: 0; }
+.pick-into { width: 46px; justify-content: center; border-left: 1px solid var(--edge); color: var(--rime-3); }
+.pick-take:hover, .pick-into:hover { background: var(--chamber-2); color: var(--rime); }
 .pick .pn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick svg { flex-shrink: 0; color: var(--rime-3); }
-.pick.on svg { color: var(--portal); }
+/* selected is frost, not amber: choosing is not issuing */
+.pick.on { background: var(--chamber-3); box-shadow: inset 2px 0 0 var(--ice); }
+.pick.on .pick-take { color: var(--rime); }
+.pick.on .pick-take svg { color: var(--ice); }
 
+/* A segmented choice is state, not issuance. Amber is reserved for the act of issuing and
+   for a page's one primary action, so the selected segment reads in frost. */
 .choice { display: flex; gap: 8px; }
 .choice button { flex: 1; }
+.seg { background: transparent; border-color: var(--edge); color: var(--rime-2); }
+.seg:hover:not(:disabled) { background: var(--chamber-2); color: var(--rime); }
+.seg.on {
+  background: var(--chamber-3);
+  border-color: var(--rime-3);
+  color: var(--rime);
+  box-shadow: inset 0 0 0 1px var(--edge-bright);
+}
+.seg.on.open { border-color: var(--portal); color: var(--portal); background: var(--portal-wash); }
 
 /* ================================================================
    the viewer
@@ -943,8 +978,7 @@ code {
 /* ================================================================
    the log (toasts) — entries written into the vault's day book
    ================================================================ */
-.log {
-  position: fixed;
+.log { pointer-events: none; position: fixed;
   left: 50%; bottom: 22px;
   transform: translateX(-50%);
   z-index: var(--z-log);
@@ -954,6 +988,7 @@ code {
   pointer-events: none;
 }
 .log-entry {
+  pointer-events: auto;
   display: flex; align-items: center; gap: 10px;
   padding: 10px 15px;
   background: var(--chamber-2);
@@ -965,6 +1000,15 @@ code {
   color: var(--rime);
 }
 .log-entry .lamp { animation: none; }
+.log-entry .log-text { flex: 1; min-width: 0; }
+.log-undo {
+  flex-shrink: 0;
+  background: none; border: 1px solid var(--edge-bright); border-radius: var(--r-plate);
+  padding: 4px 10px; cursor: pointer;
+  font: inherit; font-stretch: 70%; font-weight: 600; font-size: 0.74rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--rime);
+}
+.log-undo:hover { background: var(--chamber-3); border-color: var(--rime-3); }
 .log-entry.bad { border-color: oklch(0.45 0.11 25); }
 
 /* ================================================================
@@ -974,8 +1018,11 @@ code {
 .clause { background: var(--chamber); padding: clamp(18px, 2.4vw, 26px); }
 .clause + .clause { border-top: 1px solid var(--edge); }
 .clause-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 16px; }
+/* a prose clause with one action keeps its measure and puts the action beside it */
+.clause-split { display: flex; gap: clamp(18px, 3vw, 34px); align-items: flex-start; flex-wrap: wrap; }
+.clause-split > p { flex: 1 1 380px; }
 .clause-no {
-  font-stretch: 66%; font-weight: 700; font-size: 0.72rem; letter-spacing: 0.16em;
+  font-stretch: 66%; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.16em;
   color: var(--portal); font-variant-numeric: tabular-nums; flex-shrink: 0; padding-top: 2px;
 }
 .clause-title { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
@@ -1050,9 +1097,9 @@ code {
   .aisle > .mark .word { display: none; }
   .chambers { flex-direction: row; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 1; }
   .chambers::-webkit-scrollbar { display: none; }
-  .chambers a { padding: 8px 9px; gap: 8px; }
+  .chambers a { padding: 8px 10px; gap: 8px; justify-content: center; }
   .chambers a .ch-no { display: none; }
-  .chambers a .ch-name { font-size: 0.68rem; letter-spacing: 0.07em; }
+  .chambers a .ch-name { font-size: 0.76rem; letter-spacing: 0.07em; }
   /* the phone already shows the time in its own status bar */
   .cond.push { display: none; }
   .chambers a.active::before { left: 8px; right: 8px; top: auto; bottom: 0; width: auto; height: 1px; }
@@ -1077,12 +1124,82 @@ code {
   .plate { width: calc(50% - 6px); max-width: 150px; }
 }
 
+/* Reduced motion removes the decorative movement, never the feedback. Progress still
+   fills, focus still resolves, and a refused code still says so — in colour instead of
+   a shake. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
   .opens > * { animation: none; }
-  .admit { animation: admit-out 0.01ms 1400ms forwards !important; }
+  .admit { animation: admit-out 0.01ms 700ms forwards; }
+  .admit .line, .admit h1, .admit .sub { animation: none; }
+  .sheet, .backdrop, .log-entry { animation: none; }
+  .lamp.live { animation: none; }
+  .pin-dots.bad { animation: none; }
+  .pin-dots.bad .pin-dot { border-color: var(--alarm); box-shadow: 0 0 0 3px var(--alarm-wash); }
+  .plate:hover .plate-face, .plate:focus-visible .plate-face, .plate.on .plate-face { transform: none; }
+  .key:active { transform: none; }
+  .frosted { animation: none; background: var(--chamber-2); }
 }
+
+/* four chambers, one phone width: drop the icons before dropping a destination */
+@media (max-width: 480px) {
+  .chambers a svg { display: none; }
+  .chambers a { padding: 8px 7px; }
+  .chambers a .ch-name { font-size: 0.72rem; letter-spacing: 0.05em; }
+}
+
+/* find on this shelf: a filter, sitting between the location and the register */
+.sift {
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 0 14px;
+  max-width: 940px;
+}
+.sift label { flex-shrink: 0; }
+.sift .input { flex: 1; min-width: 0; max-width: 340px; }
+.sift .num { flex-shrink: 0; }
+
+/* relabelling happens on the row itself */
+.relabel { display: flex; align-items: center; gap: 6px; }
+.relabel .input { padding: 5px 9px; font-size: 0.95rem; }
+
+@media (max-width: 760px) {
+  .sift { flex-wrap: wrap; gap: 8px; }
+  .sift .input { max-width: none; }
+}
+
+/* the runs under the rack: each is the shelf it stands for, so the reading is the way in */
+.rack-key {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1px;
+  margin-top: 14px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r-panel);
+  background: var(--edge);
+  overflow: hidden;
+}
+.run {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 14px;
+  background: var(--chamber);
+  text-decoration: none;
+  color: var(--rime-2);
+  transition: background 140ms var(--ease), color 140ms var(--ease);
+}
+.run:hover { background: var(--chamber-2); color: var(--rime); }
+.run-swatch {
+  width: 13px; height: 17px; flex-shrink: 0; border-radius: 1px; position: relative;
+  box-shadow: inset 0 1px 0 oklch(0.98 0.004 230 / 0.16), inset 0 -2px 0 oklch(0.13 0.016 250 / 0.3);
+}
+.run-swatch::after {
+  content: ''; position: absolute; inset: auto 1px 2px; height: 3px;
+  background-image: var(--slot-band, none); background-size: 4px 3px; opacity: 0.8;
+}
+.run-name { flex: 1; min-width: 0; font-size: 0.9rem; }
+.run-q { font-stretch: 78%; font-weight: 600; font-size: 0.88rem; color: var(--rime); }
+.run-share {
+  font-stretch: 68%; font-weight: 600; font-size: 0.72rem; letter-spacing: 0.08em;
+  color: var(--rime-3); width: 3.2em; text-align: right;
+}
+
+/* the rack is an instrument, not a wall */
+.rack { max-width: 940px; }

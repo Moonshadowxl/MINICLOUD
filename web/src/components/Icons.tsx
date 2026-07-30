@@ -230,3 +230,10 @@ export function formMark(e: { isDir: boolean; mime: string; category: string; na
   if (e.category === 'projects') return <SourceIcon size={size} />;
   return <PageIcon size={size} />;
 }
+
+export const IntoIcon = (p: P) => (
+  <Mark {...p}>
+    <path d="M4 12h14" />
+    <path d="m12.5 5.5 6.5 6.5-6.5 6.5" />
+  </Mark>
+);

@@ -33,15 +33,17 @@ export const useSession = () => useContext(SessionCtx);
 
 // ---------- toasts ----------
 
-interface Toast { id: number; text: string; error?: boolean }
-const ToastCtx = createContext<(text: string, error?: boolean) => void>(() => undefined);
+export interface ToastAction { label: string; run: () => void | Promise<void> }
+interface Toast { id: number; text: string; error?: boolean; action?: ToastAction }
+const ToastCtx = createContext<(text: string, error?: boolean, action?: ToastAction) => void>(() => undefined);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const push = useCallback((text: string, error = false) => {
+  const push = useCallback((text: string, error = false, action?: ToastAction) => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, text, error }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
+    setToasts((t) => [...t, { id, text, error, action }]);
+    // an entry offering a way back stays up long enough to take it
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 7000 : 3500);
   }, []);
   return (
     <ToastCtx.Provider value={push}>
@@ -51,7 +53,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div key={t.id} className={`log-entry${t.error ? ' bad' : ''}`}>
             <span className={`lamp ${t.error ? 'alarm' : 'live'}`} />
-            {t.text}
+            <span className="log-text">{t.text}</span>
+            {t.action && (
+              <button
+                className="log-undo"
+                onClick={() => {
+                  void t.action?.run();
+                  setToasts((all) => all.filter((x) => x.id !== t.id));
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>
