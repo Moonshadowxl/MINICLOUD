@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { api, fmtBytes, uploadFiles, type Entry, type UploadProgress } from '../api';
 import { useToast } from '../state';
 import Viewer from '../components/Viewer';
+import { useAsk } from '../components/Ask';
 import { Down, Folder, Plate, Plus, glyphFor } from '../icons';
 
 export default function Files() {
@@ -14,6 +15,7 @@ export default function Files() {
   const [viewing, setViewing] = useState<Entry | null>(null);
   const [dragOver, setDragOver] = useState(0);
   const toast = useToast();
+  const ask = useAsk();
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
 
@@ -99,6 +101,15 @@ export default function Files() {
   };
 
   const del = async (entry: Entry) => {
+    const ok = await ask.confirm({
+      title: `Move "${entry.name}" to the trash?`,
+      body: entry.isDir
+        ? 'Everything inside it goes too. You can restore it from Settings.'
+        : 'You can restore it from Settings.',
+      confirmLabel: 'Move to trash',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api(`/files/${entry.id}`, { method: 'DELETE' });
       toast(`Moved "${entry.name}" to the trash`);
@@ -107,7 +118,11 @@ export default function Files() {
   };
 
   const rename = async (entry: Entry) => {
-    const name = prompt('New name', entry.name);
+    const name = await ask.prompt({
+      title: `Rename "${entry.name}"`,
+      confirmLabel: 'Rename',
+      field: { label: 'New name', initial: entry.name },
+    });
     if (!name || name === entry.name) return;
     const parent = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : '';
     try {
@@ -122,7 +137,11 @@ export default function Files() {
   };
 
   const newFolder = async () => {
-    const name = prompt('Folder name');
+    const name = await ask.prompt({
+      title: 'New folder',
+      confirmLabel: 'Create',
+      field: { label: 'Folder name', placeholder: 'projects' },
+    });
     if (!name) return;
     try {
       await api('/files/mkdir', { method: 'POST', body: JSON.stringify({ path: path ? `${path}/${name}` : name }) });
@@ -141,15 +160,18 @@ export default function Files() {
       onDrop={onDrop}
     >
       <div className="page-head">
-        <nav className="breadcrumbs" aria-label="Path">
-          <button onClick={() => go('')}>Files</button>
-          {crumbs.map((c, i) => (
-            <span key={i} style={{ display: 'contents' }}>
-              <span className="sep">/</span>
-              <button onClick={() => go(crumbs.slice(0, i + 1).join('/'))}>{c}</button>
-            </span>
-          ))}
-        </nav>
+        <div>
+          <h1>Files</h1>
+          <nav className="breadcrumbs" aria-label="Path">
+            <button onClick={() => go('')}>All files</button>
+            {crumbs.map((c, i) => (
+              <span key={i} style={{ display: 'contents' }}>
+                <span className="sep">/</span>
+                <button onClick={() => go(crumbs.slice(0, i + 1).join('/'))}>{c}</button>
+              </span>
+            ))}
+          </nav>
+        </div>
         <div className="actions-inline">
           <button className="btn btn-sm" onClick={newFolder}><Plus size={14} /> New folder</button>
           <button className="btn btn-sm" onClick={() => folderInput.current?.click()}>Upload folder</button>
@@ -227,6 +249,7 @@ export default function Files() {
       )}
 
       {viewing && <Viewer entry={viewing} onClose={() => setViewing(null)} />}
+      {ask.dialog}
     </div>
   );
 }

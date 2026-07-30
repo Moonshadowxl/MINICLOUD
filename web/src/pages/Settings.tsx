@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, fmtBytes, type Entry, type PublicUser } from '../api';
 import { useSession, useToast } from '../state';
 import { Rule } from '../icons';
+import { useAsk } from '../components/Ask';
 
 export default function Settings() {
   const { user } = useSession();
@@ -21,6 +22,7 @@ export default function Settings() {
 
 function SecurityPanel() {
   const toast = useToast();
+  const ask = useAsk();
   const [pw, setPw] = useState({ current: '', next: '' });
   const [pin, setPin] = useState({ current: '', next: '' });
 
@@ -36,13 +38,16 @@ function SecurityPanel() {
         } catch (err) { toast((err as Error).message, true); }
       }}>
         <div className="field">
-          <label>Change password</label>
-          <input className="input" type="password" placeholder="Current password" value={pw.current}
+          <label htmlFor="pw-current">Current password</label>
+          <input id="pw-current" className="input" type="password" value={pw.current}
             autoComplete="current-password" onChange={(e) => setPw({ ...pw, current: e.target.value })} />
         </div>
         <div className="field">
-          <input className="input" type="password" placeholder="New password (min 6 chars)" value={pw.next}
+          <label htmlFor="pw-next">New password</label>
+          <input id="pw-next" className="input" type="password" value={pw.next}
+            aria-describedby="pw-next-hint"
             autoComplete="new-password" onChange={(e) => setPw({ ...pw, next: e.target.value })} />
+          <span className="hint" id="pw-next-hint">At least 6 characters.</span>
         </div>
         <button className="btn btn-sm" disabled={!pw.current || pw.next.length < 6}>Update password</button>
       </form>
@@ -56,20 +61,29 @@ function SecurityPanel() {
         } catch (err) { toast((err as Error).message, true); }
       }}>
         <div className="field">
-          <label>Change PIN (leave new PIN empty to remove)</label>
-          <input className="input" type="password" placeholder="Your password" value={pin.current}
+          <label htmlFor="pin-pw">Your password</label>
+          <input id="pin-pw" className="input" type="password" value={pin.current}
             autoComplete="current-password" onChange={(e) => setPin({ ...pin, current: e.target.value })} />
         </div>
         <div className="field">
-          <input className="input" inputMode="numeric" maxLength={6} placeholder="New PIN (4-6 digits)" value={pin.next}
+          <label htmlFor="pin-next">New PIN</label>
+          <input id="pin-next" className="input" inputMode="numeric" maxLength={6} value={pin.next}
+            aria-describedby="pin-next-hint"
             onChange={(e) => setPin({ ...pin, next: e.target.value.replace(/\D/g, '') })} />
+          <span className="hint" id="pin-next-hint">4–6 digits. Leave empty to remove your PIN.</span>
         </div>
         <button className="btn btn-sm" disabled={!pin.current}>Update PIN</button>
       </form>
 
       <div className="panel-note">
         <button className="btn btn-danger btn-sm" onClick={async () => {
-          if (!confirm('Forget this device? PIN unlock stops working here until you sign in with your password again.')) return;
+          const ok = await ask.confirm({
+            title: 'Forget this device?',
+            body: 'PIN unlock stops working here until you sign in with your password again.',
+            confirmLabel: 'Forget it',
+            danger: true,
+          });
+          if (!ok) return;
           await api('/auth/forget-device', { method: 'POST' });
           location.href = '/';
         }}>Forget this device</button>
@@ -77,6 +91,7 @@ function SecurityPanel() {
           Removes this device's trusted status — do this on shared or borrowed computers.
         </p>
       </div>
+      {ask.dialog}
     </section>
   );
 }
@@ -84,12 +99,21 @@ function SecurityPanel() {
 function ProfilesPanel() {
   const { user } = useSession();
   const toast = useToast();
+  const ask = useAsk();
   const [profiles, setProfiles] = useState<PublicUser[]>([]);
   const load = () => api<{ profiles: PublicUser[] }>('/auth/profiles').then((r) => setProfiles(r.profiles));
   useEffect(() => { load(); }, []);
 
   const setQuota = async (p: PublicUser) => {
-    const gb = prompt(`Quota for ${p.displayName} in GB (empty = shared pool)`);
+    const gb = await ask.prompt({
+      title: `Quota for ${p.displayName}`,
+      confirmLabel: 'Set quota',
+      field: {
+        label: 'Size in GB',
+        placeholder: 'e.g. 50',
+        hint: 'Leave empty to let them share the whole pool.',
+      },
+    });
     if (gb === null) return;
     const trimmed = gb.trim();
     // A stray letter used to sail through as NaN, and a huge number was stored
@@ -107,7 +131,14 @@ function ProfilesPanel() {
   };
 
   const remove = async (p: PublicUser) => {
-    if (!confirm(`Remove ${p.displayName} and everything they stored? This cannot be undone.`)) return;
+    const ok = await ask.confirm({
+      title: `Remove ${p.displayName}?`,
+      body: 'Their profile and every file they stored is deleted from this machine. This cannot be undone.',
+      confirmLabel: 'Remove profile',
+      danger: true,
+      typeToConfirm: p.username,
+    });
+    if (!ok) return;
     try {
       await api(`/auth/users/${p.id}`, { method: 'DELETE' });
       toast(`Removed ${p.displayName}`);
@@ -139,6 +170,7 @@ function ProfilesPanel() {
         Add a profile from the welcome screen — “Switch user”, then “Add user”. Up to 6,
         and it asks for your owner password.
       </p>
+      {ask.dialog}
     </section>
   );
 }
@@ -178,6 +210,7 @@ function SearchPanel() {
 
 function TrashPanel() {
   const toast = useToast();
+  const ask = useAsk();
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const load = () => api<{ entries: Entry[] }>('/files/trash').then((r) => setEntries(r.entries)).catch(() => setEntries([]));
   useEffect(() => { load(); }, []);
@@ -205,7 +238,13 @@ function TrashPanel() {
                   catch (err) { toast((err as Error).message, true); }
                 }}>Restore</button>
                 <button className="btn btn-danger btn-sm" onClick={async () => {
-                  if (!confirm(`Delete "${e.name}" forever? This can't be undone.`)) return;
+                  const ok = await ask.confirm({
+                    title: `Delete "${e.name}" forever?`,
+                    body: 'This removes the encrypted copy from disk. It cannot be undone.',
+                    confirmLabel: 'Delete forever',
+                    danger: true,
+                  });
+                  if (!ok) return;
                   await api(`/files/${e.id}/purge`, { method: 'DELETE' });
                   toast('Deleted forever');
                   load();
@@ -215,6 +254,7 @@ function TrashPanel() {
           ))}
         </div>
       )}
+      {ask.dialog}
     </section>
   );
 }

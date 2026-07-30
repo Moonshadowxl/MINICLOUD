@@ -126,7 +126,7 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
         <div className="modal-body">
 
         <div className="field">
-          <label>Pick what to serve {browsePath && <>— in <code>{browsePath}</code></>}</label>
+          <span className="field-caption">Pick what to serve {browsePath && <>— in <code>{browsePath}</code></>}</span>
           <div className="picker">
             {browsePath && (
               <button className="btn btn-sm" style={{ margin: 6 }}
@@ -134,20 +134,29 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
                 <Back size={13} /> up
               </button>
             )}
+            {/*
+              These were bare <div onClick> rows, so "serve a folder as a live app"
+              — one of the product's headline capabilities — could not be reached
+              from the keyboard at all. They are buttons now, with the open action
+              as its own control rather than a double-click nobody discovers.
+            */}
             {entries.map((e) => (
-              <div key={e.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', cursor: 'pointer',
-                  background: path === e.path ? 'var(--iron-wash)' : undefined,
-                }}
-                onClick={() => { setPath(e.path); if (!name) setName(e.name.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')); }}
-                onDoubleClick={() => e.isDir && setBrowsePath(e.path)}
-              >
-                <span className="file-sym" aria-hidden>{e.isDir ? <Folder size={18} /> : <Document size={18} />}</span>
-                <span className="grow">{e.name}</span>
+              <div key={e.id} className={`pick-row${path === e.path ? ' selected' : ''}`}>
+                <button
+                  type="button"
+                  className="pick-choose"
+                  aria-pressed={path === e.path}
+                  onClick={() => {
+                    setPath(e.path);
+                    if (!name) setName(e.name.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, ''));
+                  }}
+                >
+                  <span className="file-sym" aria-hidden>{e.isDir ? <Folder size={18} /> : <Document size={18} />}</span>
+                  <span className="grow truncate">{e.name}</span>
+                </button>
                 {e.isDir && (
-                  <button className="btn btn-sm" onClick={(ev) => { ev.stopPropagation(); setBrowsePath(e.path); }}>
-                    open
+                  <button type="button" className="btn btn-sm" onClick={() => setBrowsePath(e.path)}>
+                    Open
                   </button>
                 )}
               </div>
@@ -165,7 +174,7 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
         </div>
 
         <div className="field">
-          <label>Who can open it?</label>
+          <span className="field-caption">Who can open it?</span>
           <div style={{ display: 'flex', gap: 8 }}>
             {(['private', 'public'] as const).map((v) => (
               <button key={v} type="button"

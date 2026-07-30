@@ -10,7 +10,7 @@ const ACCESS_TTL = 15 * 60; // seconds
  * Observer inks. Printed-plate colours, all in one saturation family so no
  * profile shouts louder than another and none fights the iron the app is set in.
  */
-const COLORS = ['#2f4a5c', '#7a2f24', '#2c5f5a', '#8a6220', '#463d63', '#4d5f2e'];
+const COLORS = ['#2f4a5c', '#5a4a7a', '#2c5f5a', '#8a6220', '#463d63', '#4d5f2e'];
 
 /**
  * Largest quota we will store. SQLite happily holds a full 64-bit integer, but

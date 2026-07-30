@@ -30,12 +30,29 @@ export default function Welcome() {
   useEffect(() => { load().catch(() => undefined); }, []);
 
   const finishing = useRef(false);
+  const enter = useRef<(() => void) | null>(null);
   const finish = (user: PublicUser) => {
     if (finishing.current) return; // one splash, one timer — no stale setUser later
     finishing.current = true;
     setGreeting(greetingFor(user.displayName));
-    setTimeout(() => setUser(user), 1750);
+    // Shortened, and skippable: any key or click cuts straight through. A page-load
+    // sequence you cannot dismiss is friction on every unlock after the first.
+    let done = false;
+    const go = () => { if (!done) { done = true; setUser(user); } };
+    enter.current = go;
+    setTimeout(go, 1100);
   };
+
+  useEffect(() => {
+    if (!greeting) return;
+    const skip = () => enter.current?.();
+    window.addEventListener('keydown', skip);
+    window.addEventListener('pointerdown', skip);
+    return () => {
+      window.removeEventListener('keydown', skip);
+      window.removeEventListener('pointerdown', skip);
+    };
+  }, [greeting]);
 
   const pick = (p: PublicUser) => {
     setSelected(p);
@@ -118,7 +135,7 @@ export default function Welcome() {
       </footer>
 
       {greeting && (
-        <div className="greeting" aria-live="polite">
+        <div className="greeting" aria-live="polite" role="status">
           <div className="greeting-inner">
             <Station size={54} className="stamp" />
             <h1>{greeting.title}</h1>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, fmtBytes, type SearchHit } from '../api';
 import { Lens, glyphFor } from '../icons';
+import { useModal } from './useModal';
 
 /**
  * Search everything, from anywhere: ⌘K / Ctrl-K.
@@ -63,9 +64,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const listRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => inputRef.current?.focus(), []);
+  const dialogRef = useModal(onClose);
 
   // Debounced as-you-type search; a slow response can never overwrite a newer one.
   useEffect(() => {
@@ -112,11 +111,11 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="backdrop cp-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="palette" role="dialog" aria-modal="true" aria-label="Search">
+      <div ref={dialogRef} className="palette" role="dialog" aria-modal="true" aria-label="Search">
         <div className="cp-input-row">
           <Lens size={17} className="cp-search-ico" />
           <input
-            ref={inputRef}
+            data-autofocus
             className="cp-input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

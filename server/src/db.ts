@@ -15,7 +15,7 @@ export function openDb(dbPath: string): DB {
       id            TEXT PRIMARY KEY,
       username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
       display_name  TEXT NOT NULL,
-      color         TEXT NOT NULL DEFAULT '#7c5cff',
+      color         TEXT NOT NULL DEFAULT '#2f4a5c',
       password_hash TEXT NOT NULL,
       pin_hash      TEXT,
       data_key      TEXT NOT NULL,            -- user data key, wrapped by master key

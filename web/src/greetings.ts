@@ -1,6 +1,11 @@
 /**
  * Time-of-day greetings. Local, instant, works offline — deliberately not an LLM call.
- * The late-night "Moonlight" band is the signature moment.
+ *
+ * Written in the station's own voice: calm, specific, about *this machine*. The
+ * generic-assistant register ("Rise and shine", "keep it rolling", "the cloud never
+ * sleeps") is what every product ships, and here it lands in the largest type on the
+ * most personal screen — the one place the whole design would read as generated.
+ * The late-night "Moonlight" line is a pinned brand moment and stays.
  */
 
 export type Band = 'morning' | 'afternoon' | 'evening' | 'night';
@@ -15,33 +20,37 @@ export function bandFor(hour: number): Band {
 const LINES: Record<Band, string[]> = {
   morning: [
     'Good morning, {name}',
-    'Morning, {name} — fresh start',
-    'Rise and shine, {name}',
-    'Coffee first, {name}?',
+    'Morning, {name}',
+    'First light, {name}',
+    'Clear morning, {name}',
   ],
   afternoon: [
     'Good afternoon, {name}',
-    'Afternoon, {name} — keep it rolling',
-    'Hey {name}, midday check-in',
+    'Afternoon, {name}',
+    'Midday, {name}',
   ],
   evening: [
     'Good evening, {name}',
-    'Evening, {name} — wind down or lock in?',
+    'Evening, {name}',
     'Welcome back, {name}',
   ],
   night: [
-    'Moonlight, {name} 🌙',
-    'Late night, {name}? Your files kept watch',
-    'Still up, {name}? The cloud never sleeps',
-    'Night shift, {name} 🌙',
+    'Moonlight, {name}',
+    'Night watch, {name}',
+    'Still up, {name}?',
+    'Late hours, {name}',
   ],
 };
 
+/**
+ * Subtitles state something true about the machine rather than promising
+ * activity ("everything synced while you slept") that may not have happened.
+ */
 const SUBS: Record<Band, string> = {
-  morning: 'Everything synced while you slept.',
-  afternoon: 'Your cloud is humming along.',
-  evening: 'All quiet in the cloud.',
-  night: 'Quiet hours — everything is safe.',
+  morning: 'The station held overnight.',
+  afternoon: 'Everything is where you left it.',
+  evening: 'All quiet on the station.',
+  night: 'Running quietly, nothing to do.',
 };
 
 export function greetingFor(name: string, date = new Date()): { title: string; sub: string; band: Band } {

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, connectEvents, fmtAgo, fmtBytes, type ServedApp, type Usage } from '../api';
 import { greetingFor } from '../greetings';
 import { useClock, useSession } from '../state';
-import { GENUS, SkyCover, Broadcast, type GenusKey } from '../icons';
+import { GENUS, SkyCover, Broadcast, Plate, type GenusKey } from '../icons';
 
 /**
  * The station reading.
@@ -25,6 +25,9 @@ const OKTA_WORD = [
   'clear', 'almost clear', 'a little cover', 'scattered', 'half covered',
   'more than half', 'mostly covered', 'nearly full', 'full',
 ];
+
+const coverWord = (okta: number, used: number) =>
+  okta === 0 && used > 0 ? 'barely a trace' : OKTA_WORD[okta];
 
 export default function Home() {
   const { user } = useSession();
@@ -85,7 +88,7 @@ export default function Home() {
                 {fmtBytes(usage.used)} <span className="of">of {fmtBytes(usage.quota)}</span>
               </div>
               <p className="reading-note">
-                {fmtBytes(free)} still free — {OKTA_WORD[okta]}.
+                {fmtBytes(free)} still free — {coverWord(okta, usage.used)}.
                 {usage.trashBytes > 0 && <> {fmtBytes(usage.trashBytes)} of that is waiting in the trash.</>}
                 {okta >= 7 && <span className="over"> Running out of room.</span>}
               </p>
@@ -95,6 +98,18 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      {usage && usage.used === 0 && (
+        <section className="section" aria-label="Getting started">
+          <div className="empty" style={{ padding: '22px 0 6px' }}>
+            <Plate size={30} className="empty-sym" />
+            <h3>Nothing collected yet</h3>
+            <p>Put something on this machine and it appears here, sorted into the four
+               kinds below. A whole repository works — drop the folder in.</p>
+            <Link to="/files" className="btn btn-primary btn-sm">Add your first files</Link>
+          </div>
+        </section>
+      )}
 
       <section aria-label="What is stored">
         <div className="section-head" style={{ margin: '24px 34px 0', padding: '0 0 9px' }}>

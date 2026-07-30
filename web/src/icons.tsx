@@ -81,6 +81,8 @@ export type GenusKey = keyof typeof GENUS;
  */
 export function SkyCover({ fraction, size = 64 }: { fraction: number; size?: number }) {
   const okta = Math.max(0, Math.min(8, Math.round(fraction * 8)));
+  /** Something is stored, but less than an eighth — a trace, not nothing. */
+  const trace = okta === 0 && fraction > 0;
   const r = 10;
   const c = 12;
 
@@ -97,7 +99,7 @@ export function SkyCover({ fraction, size = 64 }: { fraction: number; size?: num
 
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className="skycover" role="img"
-      aria-label={`Sky cover ${okta} oktas of 8`}>
+      aria-label={trace ? 'Sky cover under one okta' : `Sky cover ${okta} oktas of 8`}>
       {/* Graticule: eighth marks around the rim, so an empty circle still reads
           as a calibrated instrument rather than an unfinished ring. */}
       {Array.from({ length: 8 }).map((_, i) => {
@@ -113,6 +115,7 @@ export function SkyCover({ fraction, size = 64 }: { fraction: number; size?: num
         );
       })}
       {wedge(okta)}
+      {trace && <path d={`M${c} ${c - r} V${c - r * 0.42}`} stroke="currentColor" strokeWidth={1.6} />}
       <circle cx={c} cy={c} r={r} fill="none" stroke="currentColor" strokeWidth={1.4} />
       {/* the observer's meridian, kept visible through the fill */}
       <path d={`M${c} ${c - r} V${c + r}`} stroke="var(--paper-lit)" strokeWidth={okta > 0 ? 0.9 : 0} opacity={0.5} />

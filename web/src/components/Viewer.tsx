@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fmtBytes, type Entry } from '../api';
-import { Down } from '../icons';
+import { Cross, Down } from '../icons';
+import { useModal } from './useModal';
 
 const TEXT_EXT = new Set([
   'txt', 'md', 'json', 'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'css', 'html', 'htm', 'xml', 'svg',
@@ -22,11 +23,7 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
     : entry.mime.startsWith('image/') ? 'image'
     : isText(entry) ? 'text' : 'other';
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const dialogRef = useModal(onClose);
 
   useEffect(() => {
     if (kind !== 'text') return;
@@ -41,10 +38,14 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
 
   return (
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal${kind === 'video' || kind === 'text' ? ' wide' : ''}`} role="dialog" aria-label={entry.name}>
+      <div ref={dialogRef} className={`modal${kind === 'video' || kind === 'text' ? ' wide' : ''}`}
+        role="dialog" aria-modal="true" aria-label={entry.name}>
         <div className="modal-head">
           <h3>{entry.name}</h3>
           <span className="measure">{fmtBytes(entry.size)}</span>
+          <button type="button" className="modal-x" onClick={onClose} aria-label="Close">
+            <Cross size={16} />
+          </button>
         </div>
         <div className="modal-body">
           <div className="viewer-body">
@@ -70,8 +71,10 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
           </div>
         </div>
         <div className="modal-actions">
-          <a className="btn" href={`${src}?download`} download={entry.name}><Down size={14} /> Download</a>
-          <button className="btn btn-primary" onClick={onClose}>Close</button>
+          <button className="btn" onClick={onClose}>Close</button>
+          <a className="btn btn-primary" href={`${src}?download`} download={entry.name}>
+            <Down size={14} /> Download
+          </a>
         </div>
       </div>
     </div>
