@@ -4,6 +4,9 @@ Your personal 24/7 cloud, running on your own spare PC or laptop.
 
 - **Store anything** — files, media, apps, and *entire codebases* (drop a whole repo in;
   `node_modules` and friends are skipped automatically).
+- **Find anything** — press <kbd>⌘K</kbd> / <kbd>Ctrl</kbd>+<kbd>K</kbd> anywhere to search
+  by filename *or* by what's inside: function names, notes, config values. Ranked, with
+  highlighted excerpts, and it jumps you straight to the file.
 - **Stream** video and music to any device, with seeking, straight from encrypted storage.
 - **Launch** — serve any uploaded folder as a live web app at `/s/<name>/` or `http://<name>.mini/`,
   public or private. Your own tiny Vercel.
@@ -25,6 +28,9 @@ npm start              # → http://localhost:8484
 
 Open it in a browser, create the owner profile, and you're in.
 **Back up `data/keys/master.key`** — without it the encrypted files can't be read.
+
+To add someone else: "Switch user" → "Add user", and confirm with the owner password.
+Up to 6 profiles, each with its own encrypted storage.
 
 ## Documentation
 
@@ -48,7 +54,14 @@ docs/     setup guides
 ```bash
 npm run dev       # API server on :8484 (tsx watch)
 npm run dev:web   # Vite dev server on :5173, proxying /api and /s
-npm test          # storage-engine + auth test suite (vitest)
+npm test          # storage, search, auth + regression suites (vitest)
+```
+
+End-to-end, against a **fresh** instance:
+
+```bash
+MINICLOUD_DATA_DIR=/tmp/mc-e2e npm start   # terminal 1
+node scripts/e2e-browser.mjs               # terminal 2 — screenshots in e2e-shots/
 ```
 
 MIT licensed. Built to keep your work safe when the power isn't.

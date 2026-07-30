@@ -31,5 +31,8 @@ Calm, personal, a little warm. It greets you by name ("Good evening, Moon" / lat
 - Welcome/profile picker → PS5 console feel: big clock, profile tiles, PIN pad.
 - Home → usage hero (300/400 GB), category breakdown chart, last sync, live served apps.
 - Files → browse/upload/stream/preview, folder (codebase) upload, folder-as-zip.
+- Search → ⌘K from anywhere; matches filenames and file contents, ranked, with
+  highlighted excerpts and one-key jump to the file. Storing a codebase is only
+  useful if you can find things in it again.
 - Launch → serve a stored folder as an app (public/private), copy its URLs.
-- Settings → PIN/password, quotas, profiles, sync.
+- Settings → PIN/password, quotas, profiles, search index, sync.

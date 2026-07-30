@@ -57,14 +57,26 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 export const useToast = () => useContext(ToastCtx);
 
-/** Live clock string like 19:42, ticking on the minute. */
+/**
+ * Live clock string like 19:42, ticking on the minute.
+ * A self-rescheduling timeout, not an interval: an interval seeded with
+ * "seconds until the next minute" keeps that same odd period forever and
+ * drifts off the minute boundary within the hour.
+ */
 export function useClock(): string {
   const [text, setText] = useState(() => fmt(new Date()));
   useEffect(() => {
-    const tick = () => setText(fmt(new Date()));
-    const t = setInterval(tick, 1000 * (61 - new Date().getSeconds()));
-    return () => clearInterval(t);
-  }, [text]);
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const now = new Date();
+      timer = setTimeout(() => {
+        setText(fmt(new Date()));
+        schedule();
+      }, 60_000 - now.getSeconds() * 1000 - now.getMilliseconds());
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, []);
   return text;
 }
 

@@ -103,8 +103,31 @@ export function openDb(dbPath: string): DB {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- Full-text index over file names and (for text files) their contents.
+    -- 'external content' would need the row ids to line up with files.rowid; keeping
+    -- it standalone lets us reindex a single path without touching the rest.
+    CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(
+      file_id UNINDEXED,
+      user_id UNINDEXED,
+      path,
+      body,
+      tokenize = "unicode61 remove_diacritics 2"
+    );
   `);
+
+  // --- migrations (safe to re-run) ---
+  addColumn(db, 'users', 'pw_attempts', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(db, 'users', 'pw_locked_until', 'INTEGER NOT NULL DEFAULT 0');
+
   return db;
+}
+
+/** ALTER TABLE ADD COLUMN, but a no-op when the column is already there. */
+function addColumn(db: DB, table: string, column: string, decl: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (cols.some((c) => c.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
 }
 
 export const now = () => Date.now();

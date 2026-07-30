@@ -56,9 +56,6 @@ export function decrypt(key: Buffer, blob: Buffer): Buffer {
   return Buffer.concat([decipher.update(ct), decipher.final()]);
 }
 
-/** Bytes of overhead each stored chunk carries over its plaintext size. */
-export const CHUNK_OVERHEAD = IV_LEN + TAG_LEN;
-
 // --- password / PIN hashing (scrypt) ---
 
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 32 };
@@ -73,6 +70,7 @@ export function verifySecret(secret: string, stored: string): boolean {
   const [scheme, saltB64, hashB64] = stored.split('$');
   if (scheme !== 'scrypt' || !saltB64 || !hashB64) return false;
   const expected = Buffer.from(hashB64, 'base64');
+  if (expected.length !== SCRYPT.keylen) return false; // corrupt row: fail closed
   const actual = crypto.scryptSync(secret, Buffer.from(saltB64, 'base64'), expected.length, SCRYPT);
   return crypto.timingSafeEqual(expected, actual);
 }
@@ -119,4 +117,11 @@ export function randomId(bytes = 16): string {
 
 export function sha256(data: string | Buffer): string {
   return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+/** Length-safe, constant-time string compare (for tokens and digests). */
+export function timingSafeEqualStr(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
 }

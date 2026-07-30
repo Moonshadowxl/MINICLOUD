@@ -18,32 +18,59 @@ import { deviceName, syncPair } from './sync.js';
 
 const log = (s: string) => console.log(s);
 
-async function ask(q: string, hidden = false): Promise<string> {
+async function ask(q: string): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  if (!hidden) {
-    const a = await rl.question(q);
+  try {
+    return (await rl.question(q)).trim();
+  } finally {
     rl.close();
-    return a.trim();
   }
-  process.stdout.write(q);
-  const a = await new Promise<string>((resolve) => {
-    let buf = '';
-    const onData = (ch: Buffer) => {
-      const c = ch.toString();
-      if (c === '\n' || c === '\r' || c === '') {
-        process.stdin.off('data', onData);
-        process.stdout.write('\n');
-        resolve(buf);
-      } else if (c === '') process.exit(1);
-      else if (c === '') buf = buf.slice(0, -1);
-      else buf += c;
-    };
-    process.stdin.setRawMode?.(true);
-    process.stdin.on('data', onData);
-  });
-  process.stdin.setRawMode?.(false);
-  rl.close();
-  return a.trim();
+}
+
+/**
+ * Prompt for a secret without echoing it. Reads raw keystrokes so nothing lands
+ * in the terminal (or its scrollback); Ctrl-C and Ctrl-D still behave normally.
+ */
+async function askHidden(q: string): Promise<string> {
+  const { stdin, stdout } = process;
+  if (!stdin.isTTY) return ask(q); // piped input: nothing to hide it from
+
+  stdout.write(q);
+  const previouslyRaw = stdin.isRaw;
+  stdin.setRawMode(true);
+  stdin.resume();
+
+  try {
+    return await new Promise<string>((resolve, reject) => {
+      let buf = '';
+      const onData = (chunk: Buffer) => {
+        for (const byte of chunk) {
+          switch (byte) {
+            case 0x03: // Ctrl-C
+              stdin.off('data', onData);
+              stdout.write('\n');
+              return reject(new Error('cancelled'));
+            case 0x04: // Ctrl-D
+            case 0x0a: // \n
+            case 0x0d: // \r
+              stdin.off('data', onData);
+              stdout.write('\n');
+              return resolve(buf.trim());
+            case 0x7f: // backspace
+            case 0x08:
+              buf = buf.slice(0, -1);
+              break;
+            default:
+              if (byte >= 0x20) buf += String.fromCharCode(byte);
+          }
+        }
+      };
+      stdin.on('data', onData);
+    });
+  } finally {
+    stdin.setRawMode(previouslyRaw);
+    stdin.pause();
+  }
 }
 
 function requireConfig(): AgentConfig {
@@ -74,7 +101,7 @@ async function cmdInit(): Promise<void> {
 
 async function cmdLogin(): Promise<void> {
   const config = requireConfig();
-  const password = await ask(`Password for ${config.username} @ ${config.server}: `, true);
+  const password = await askHidden(`Password for ${config.username} @ ${config.server}: `);
   const res = await fetch(`${config.server}/api/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

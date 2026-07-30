@@ -32,6 +32,8 @@ export default function Home() {
 
   const pct = usage ? Math.min(100, (usage.used / usage.quota) * 100) : 0;
   const meterState = pct > 92 ? 'danger' : pct > 75 ? 'warn' : '';
+  // The breakdown covers live files only, so scale the bar to that — not to `used`,
+  // which also counts trash and would leave an unexplained gap on the right.
   const breakdownTotal = usage ? Math.max(1, CATS.reduce((s, c) => s + (usage.breakdown[c.key] ?? 0), 0)) : 1;
 
   return (
@@ -99,7 +101,7 @@ export default function Home() {
           {apps === null ? (
             <div className="skeleton" style={{ height: 80 }} />
           ) : apps.length === 0 ? (
-            <div style={{ color: 'var(--ink-soft)' }}>
+            <div className="soft">
               <p style={{ margin: '4px 0 10px' }}>Nothing is being served yet.</p>
               <Link to="/launch" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
                 Serve your first app
@@ -108,9 +110,9 @@ export default function Home() {
           ) : (
             <div className="rows">
               {apps.map((a) => (
-                <div className="row" key={a.id} style={{ padding: '8px 0' }}>
+                <div className="row row-tight" key={a.id}>
                   <div className="grow">
-                    <div className="name" style={{ cursor: 'default' }}>{a.name}</div>
+                    <div className="name static">{a.name}</div>
                     <a className="meta" href={a.urls[0]} target="_blank" rel="noreferrer">{a.urls[0]}</a>
                   </div>
                   <span className={`badge ${a.visibility}`}>{a.visibility}</span>

@@ -39,6 +39,12 @@ export default function Welcome() {
     setMode(p.hasPin ? 'pin' : 'password');
   };
 
+  /** Back always returns to a clean picker — a leftover `selected` used to blank the screen. */
+  const backToPick = () => {
+    setSelected(null);
+    setMode('pick');
+  };
+
   return (
     <div className={`welcome${night ? ' night' : ''}`}>
       <div className="welcome-top">
@@ -58,7 +64,7 @@ export default function Welcome() {
                   key={p.id}
                   className={`profile${selected?.id === p.id ? ' selected' : ''}`}
                   onClick={() => pick(p)}
-                >
+              >
                   <span className="profile-tile" style={{ background: p.color }}>
                     {p.displayName[0]?.toUpperCase()}
                   </span>
@@ -78,23 +84,20 @@ export default function Welcome() {
         {mode === 'pin' && selected && (
           <PinUnlock
             user={selected}
-            onBack={() => setMode('pick')}
+            onBack={backToPick}
             onPassword={() => setMode('password')}
             onDone={finish}
           />
         )}
 
         {mode === 'password' && selected && (
-          <PasswordLogin user={selected} onBack={() => setMode('pick')} onDone={finish} />
+          <PasswordLogin user={selected} onBack={backToPick} onDone={finish} />
         )}
 
         {mode === 'setup' && <SetupForm onDone={finish} />}
 
-        {mode === 'add' && selected === null && (
-          <AddUserForm
-            onBack={() => setMode('pick')}
-            onDone={() => { setMode('pick'); load(); }}
-          />
+        {mode === 'add' && (
+          <AddUserForm onBack={backToPick} onDone={() => { backToPick(); load(); }} />
         )}
       </div>
 
@@ -137,8 +140,8 @@ function PinUnlock({ user, onBack, onPassword, onDone }: {
     <div className="pinpad">
       <h2>Hi {user.displayName} — your PIN</h2>
       <PinPad onSubmit={submit} />
-      {error && <div style={{ color: 'var(--danger)', fontWeight: 550 }}>{error}</div>}
-      <div style={{ display: 'flex', gap: 10 }}>
+      {error && <div className="form-error">{error}</div>}
+      <div className="form-actions">
         <button className="btn btn-ghost btn-sm" onClick={onBack}>Back</button>
         <button className="btn btn-ghost btn-sm" onClick={onPassword}>Use password</button>
       </div>
@@ -174,35 +177,44 @@ function PasswordLogin({ user, onBack, onDone }: {
   };
 
   return (
-    <form onSubmit={submit} style={{ width: 300 }}>
-      <h2 style={{ textAlign: 'center', marginBottom: 18 }}>Welcome back, {user.displayName}</h2>
+    <form onSubmit={submit} className="narrow-form">
+      <h2>Welcome back, {user.displayName}</h2>
       <div className="field">
         <label htmlFor="pw">Password</label>
         <input id="pw" ref={ref} className="input" type="password" value={password}
           onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
       </div>
-      {error && <div style={{ color: 'var(--danger)', marginBottom: 10, fontWeight: 550 }}>{error}</div>}
-      <div style={{ display: 'flex', gap: 10 }}>
+      {error && <div className="form-error">{error}</div>}
+      <div className="form-actions">
         <button type="button" className="btn btn-ghost" onClick={onBack}>Back</button>
-        <button className="btn btn-primary" style={{ flex: 1 }} disabled={busy || !password}>
+        <button className="btn btn-primary grow" disabled={busy || !password}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
       </div>
-      <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)', marginTop: 12 }}>
+      <p className="hint signin-note">
         Signing in with your password marks this device as trusted — next time your PIN is enough.
       </p>
     </form>
   );
 }
 
-function UserForm({ title, cta, onSubmit, onBack, requirePin }: {
+export interface NewProfile {
+  username: string;
+  displayName: string;
+  password: string;
+  pin?: string;
+  ownerPassword?: string;
+}
+
+function UserForm({ title, cta, onSubmit, onBack, needsOwnerPassword }: {
   title: string;
   cta: string;
-  requirePin?: boolean;
+  /** Adding a profile from the signed-out picker has to be authorised by the owner. */
+  needsOwnerPassword?: boolean;
   onBack?: () => void;
-  onSubmit: (v: { username: string; displayName: string; password: string; pin?: string }) => Promise<void>;
+  onSubmit: (v: NewProfile) => Promise<void>;
 }) {
-  const [v, setV] = useState({ username: '', displayName: '', password: '', pin: '' });
+  const [v, setV] = useState({ username: '', displayName: '', password: '', pin: '', ownerPassword: '' });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -211,7 +223,11 @@ function UserForm({ title, cta, onSubmit, onBack, requirePin }: {
     setBusy(true);
     setError(null);
     try {
-      await onSubmit({ ...v, pin: v.pin || undefined });
+      await onSubmit({
+        ...v,
+        pin: v.pin || undefined,
+        ownerPassword: needsOwnerPassword ? v.ownerPassword : undefined,
+      });
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
@@ -219,8 +235,8 @@ function UserForm({ title, cta, onSubmit, onBack, requirePin }: {
   };
 
   return (
-    <form onSubmit={submit} style={{ width: 320 }}>
-      <h2 style={{ textAlign: 'center', marginBottom: 18 }}>{title}</h2>
+    <form onSubmit={submit} className="narrow-form">
+      <h2>{title}</h2>
       <div className="field">
         <label htmlFor="un">Username</label>
         <input id="un" className="input" value={v.username} autoComplete="off"
@@ -237,14 +253,21 @@ function UserForm({ title, cta, onSubmit, onBack, requirePin }: {
           onChange={(e) => setV({ ...v, password: e.target.value })} />
       </div>
       <div className="field">
-        <label htmlFor="pin">PIN (4-6 digits{requirePin ? '' : ', optional'}) — quick unlock on trusted devices</label>
+        <label htmlFor="pin">PIN (4-6 digits, optional) — quick unlock on trusted devices</label>
         <input id="pin" className="input" inputMode="numeric" pattern="\d*" maxLength={6} value={v.pin}
           onChange={(e) => setV({ ...v, pin: e.target.value.replace(/\D/g, '') })} />
       </div>
-      {error && <div style={{ color: 'var(--danger)', marginBottom: 10, fontWeight: 550 }}>{error}</div>}
-      <div style={{ display: 'flex', gap: 10 }}>
+      {needsOwnerPassword && (
+        <div className="field">
+          <label htmlFor="ownerpw">Owner's password — to confirm this profile is allowed</label>
+          <input id="ownerpw" className="input" type="password" autoComplete="off" value={v.ownerPassword}
+            onChange={(e) => setV({ ...v, ownerPassword: e.target.value })} />
+        </div>
+      )}
+      {error && <div className="form-error">{error}</div>}
+      <div className="form-actions">
         {onBack && <button type="button" className="btn btn-ghost" onClick={onBack}>Back</button>}
-        <button className="btn btn-primary" style={{ flex: 1 }} disabled={busy || !v.username || !v.password}>
+        <button className="btn btn-primary grow" disabled={busy || !v.username || !v.password}>
           {busy ? 'Working…' : cta}
         </button>
       </div>
@@ -271,8 +294,8 @@ function AddUserForm({ onBack, onDone }: { onBack: () => void; onDone: () => voi
       title="New profile"
       cta="Add profile"
       onBack={onBack}
+      needsOwnerPassword
       onSubmit={async (v) => {
-        // adding a profile requires someone signed in; the API enforces it
         await api('/auth/users', { method: 'POST', body: JSON.stringify(v) });
         onDone();
       }}

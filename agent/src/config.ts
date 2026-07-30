@@ -38,8 +38,11 @@ export function statePathFor(pair: FolderPair): string {
   return path.join(configDir, 'state', `${key}.json`);
 }
 
-/** Same defaults the web app uses — skip dependency/build junk when syncing codebases. */
-export const MINIIGNORE = ['node_modules', '.git', 'dist', 'build', '.next', '.cache', '__pycache__', '.DS_Store', '.minicloud-trash'];
+/** Same defaults the web app uses (web/src/api.ts) — skip dependency/build junk. */
+export const MINIIGNORE = [
+  'node_modules', '.git', 'dist', 'build', '.next', '.cache',
+  '__pycache__', '.DS_Store', '.minicloud-trash',
+];
 
 export function ignored(rel: string): boolean {
   return rel.split('/').some((part) => MINIIGNORE.includes(part));

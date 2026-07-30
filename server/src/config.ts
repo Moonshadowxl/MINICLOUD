@@ -1,5 +1,4 @@
 import path from 'node:path';
-import os from 'node:os';
 
 export interface Config {
   dataDir: string;
@@ -45,8 +44,4 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     baseDomain: process.env.MINICLOUD_BASE_DOMAIN ?? '',
     ...overrides,
   };
-}
-
-export function defaultDeviceName(): string {
-  return os.hostname() || 'device';
 }

@@ -54,7 +54,7 @@ export default function Launch() {
             <div className="row" key={a.id}>
               <span className="file-ico" aria-hidden>🚀</span>
               <div className="grow">
-                <div className="name" style={{ cursor: 'default' }}>{a.name}</div>
+                <div className="name static">{a.name}</div>
                 <div className="meta">
                   from <code>{a.rootPath}</code> ·{' '}
                   {a.urls.map((u, i) => (
@@ -139,7 +139,7 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
                 onDoubleClick={() => e.isDir && setBrowsePath(e.path)}
               >
                 <span>{e.isDir ? '📁' : '🌐'}</span>
-                <span style={{ flex: 1 }}>{e.name}</span>
+                <span className="grow">{e.name}</span>
                 {e.isDir && (
                   <button className="btn btn-ghost btn-sm" onClick={(ev) => { ev.stopPropagation(); setBrowsePath(e.path); }}>
                     open
@@ -149,14 +149,14 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
             ))}
             {entries.length === 0 && <div style={{ padding: 12, color: 'var(--ink-faint)' }}>No folders or html files here.</div>}
           </div>
-          {path && <div style={{ fontSize: '0.84rem', color: 'var(--ink-soft)' }}>Serving: <code>{path}</code></div>}
+          {path && <div className="hint soft">Serving: <code>{path}</code></div>}
         </div>
 
         <div className="field">
           <label htmlFor="app-name">Name (becomes the URL)</label>
           <input id="app-name" className="input" value={name} placeholder="my-app"
             onChange={(e) => setName(e.target.value.toLowerCase())} />
-          {name && <div style={{ fontSize: '0.84rem', color: 'var(--ink-faint)' }}>→ /s/{name}/ · http://{name}.mini/</div>}
+          {name && <div className="hint">→ /s/{name}/ · http://{name}.mini/</div>}
         </div>
 
         <div className="field">
@@ -172,7 +172,7 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
           </div>
         </div>
 
-        {error && <div style={{ color: 'var(--danger)', fontWeight: 550 }}>{error}</div>}
+        {error && <div className="form-error">{error}</div>}
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" disabled={!path || !name || busy} onClick={submit}>

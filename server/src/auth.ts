@@ -1,12 +1,30 @@
 import type { DB } from './db.js';
 import { now } from './db.js';
-import { hashSecret, randomId, sha256, signToken, verifySecret, verifyToken } from './crypto.js';
+import { hashSecret, randomId, sha256, signToken, timingSafeEqualStr, verifySecret, verifyToken } from './crypto.js';
 import { StorageError } from './storage.js';
 import type { Storage } from './storage.js';
 import type { Config } from './config.js';
 
 const ACCESS_TTL = 15 * 60; // seconds
 const COLORS = ['#7c5cff', '#00c2a8', '#ff5c8a', '#ffb020', '#3aa0ff', '#9be15d'];
+
+/**
+ * Largest quota we will store. SQLite happily holds a full 64-bit integer, but
+ * node:sqlite throws RangeError when reading one back as a JS number — a single
+ * oversized quota used to make /auth/profiles (the whole welcome screen) throw
+ * forever, with no way out but hand-editing the database.
+ */
+const MAX_QUOTA_BYTES = Number.MAX_SAFE_INTEGER;
+
+/** Reject quotas that are unrepresentable, negative, or not a number at all. */
+export function cleanQuota(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = typeof value === 'string' ? Number(value) : value;
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > MAX_QUOTA_BYTES) {
+    throw new StorageError(400, 'quota must be a positive number of bytes');
+  }
+  return Math.floor(n);
+}
 
 export interface PublicUser {
   id: string;
@@ -21,7 +39,16 @@ interface UserRow {
   id: string; username: string; display_name: string; color: string;
   password_hash: string; pin_hash: string | null; quota_bytes: number | null;
   is_owner: number; pin_attempts: number; locked_until: number; last_sync_at: number | null;
+  pw_attempts: number; pw_locked_until: number;
 }
+
+/** 5 free tries, then 30s doubling per extra failure: 30s, 1m, 2m, 4m… capped at an hour. */
+function lockoutMs(attempts: number): number {
+  if (attempts < 5) return 0;
+  return Math.min(30_000 * 2 ** (attempts - 5), 60 * 60_000);
+}
+
+const remainingSecs = (until: number): number => Math.ceil((until - now()) / 1000);
 
 export class Auth {
   constructor(
@@ -94,7 +121,7 @@ export class Auth {
         hashSecret(opts.password),
         opts.pin ? hashSecret(opts.pin) : null,
         this.storage.createUserKey(),
-        opts.quotaBytes ?? null,
+        cleanQuota(opts.quotaBytes),
         opts.isOwner ? 1 : 0,
         now(),
       );
@@ -104,7 +131,19 @@ export class Auth {
   /** Full login with password; registers the device and returns a long-lived device token. */
   loginPassword(username: string, password: string, deviceName: string) {
     const u = this.byUsername(username);
+    // Password login used to be the one unthrottled door: the PIN pad locked out
+    // after 5 tries while /auth/login accepted guesses forever.
+    if (u && u.pw_locked_until > now()) {
+      throw new StorageError(429, `too many attempts — locked for ${remainingSecs(u.pw_locked_until)}s`);
+    }
     if (!u || !verifySecret(password, u.password_hash)) {
+      if (u) {
+        const attempts = u.pw_attempts + 1;
+        const ms = lockoutMs(attempts);
+        this.db
+          .prepare('UPDATE users SET pw_attempts = ?, pw_locked_until = ? WHERE id = ?')
+          .run(attempts, ms ? now() + ms : 0, u.id);
+      }
       throw new StorageError(401, 'wrong username or password');
     }
     const deviceToken = randomId(32);
@@ -127,16 +166,14 @@ export class Auth {
     const device = this.verifyDeviceToken(deviceTokenRaw);
     if (!device || device.user_id !== u.id) throw new StorageError(401, 'device not trusted — sign in with password');
     if (u.locked_until > now()) {
-      const secs = Math.ceil((u.locked_until - now()) / 1000);
-      throw new StorageError(429, `too many attempts — locked for ${secs}s`);
+      throw new StorageError(429, `too many attempts — locked for ${remainingSecs(u.locked_until)}s`);
     }
     if (!verifySecret(pin, u.pin_hash)) {
       const attempts = u.pin_attempts + 1;
-      // 5 free tries, then 30s doubling per extra failure: 30s, 1m, 2m, 4m...
-      const lockMs = attempts >= 5 ? 30_000 * 2 ** (attempts - 5) : 0;
+      const ms = lockoutMs(attempts);
       this.db
         .prepare('UPDATE users SET pin_attempts = ?, locked_until = ? WHERE id = ?')
-        .run(attempts, lockMs ? now() + lockMs : 0, u.id);
+        .run(attempts, ms ? now() + ms : 0, u.id);
       throw new StorageError(401, 'wrong PIN');
     }
     this.resetPinLock(u.id);
@@ -144,8 +181,11 @@ export class Auth {
     return { user: this.toPublic(u), accessToken: this.accessToken(u) };
   }
 
+  /** A successful sign-in of either kind clears both lockout counters. */
   private resetPinLock(userId: string): void {
-    this.db.prepare('UPDATE users SET pin_attempts = 0, locked_until = 0 WHERE id = ?').run(userId);
+    this.db
+      .prepare('UPDATE users SET pin_attempts = 0, locked_until = 0, pw_attempts = 0, pw_locked_until = 0 WHERE id = ?')
+      .run(userId);
   }
 
   verifyDeviceToken(raw: string): { id: string; user_id: string } | null {
@@ -156,7 +196,7 @@ export class Auth {
     const row = this.db.prepare('SELECT id, user_id, token_hash FROM devices WHERE id = ?').get(deviceId) as
       | { id: string; user_id: string; token_hash: string }
       | undefined;
-    if (!row || row.token_hash !== sha256(token)) return null;
+    if (!row || !timingSafeEqualStr(row.token_hash, sha256(token))) return null;
     return { id: row.id, user_id: row.user_id };
   }
 
@@ -187,10 +227,45 @@ export class Auth {
     this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashSecret(newPassword), userId);
   }
 
-  setQuota(actorId: string, targetUserId: string, quotaBytes: number | null): void {
+  setQuota(actorId: string, targetUserId: string, quotaBytes: unknown): void {
     const actor = this.byId(actorId);
     if (!actor?.is_owner) throw new StorageError(403, 'only the owner can set quotas');
-    this.db.prepare('UPDATE users SET quota_bytes = ? WHERE id = ?').run(quotaBytes, targetUserId);
+    if (!this.byId(targetUserId)) throw new StorageError(404, 'user not found');
+    this.db.prepare('UPDATE users SET quota_bytes = ? WHERE id = ?').run(cleanQuota(quotaBytes), targetUserId);
+  }
+
+  /** Owner-password check used by the signed-out "add a profile" path. */
+  assertOwnerPassword(password: string): void {
+    const owner = this.db.prepare('SELECT * FROM users WHERE is_owner = 1 ORDER BY created_at').get() as
+      | UserRow
+      | undefined;
+    if (!owner) throw new StorageError(409, 'no owner profile yet');
+    if (owner.pw_locked_until > now()) {
+      throw new StorageError(429, `too many attempts — locked for ${remainingSecs(owner.pw_locked_until)}s`);
+    }
+    if (!verifySecret(password, owner.password_hash)) {
+      const attempts = owner.pw_attempts + 1;
+      const ms = lockoutMs(attempts);
+      this.db
+        .prepare('UPDATE users SET pw_attempts = ?, pw_locked_until = ? WHERE id = ?')
+        .run(attempts, ms ? now() + ms : 0, owner.id);
+      throw new StorageError(401, 'wrong owner password');
+    }
+    this.resetPinLock(owner.id);
+  }
+
+  /**
+   * Delete a profile. Owner only, never yourself, never the last owner.
+   * Returns the ids of rows removed so the caller can drop the encrypted chunks;
+   * the ON DELETE CASCADE takes care of files/blobs/devices/uploads.
+   */
+  deleteUser(actorId: string, targetId: string): void {
+    const actor = this.byId(actorId);
+    if (!actor?.is_owner) throw new StorageError(403, 'only the owner can remove profiles');
+    if (actorId === targetId) throw new StorageError(400, 'you cannot remove your own profile');
+    const target = this.byId(targetId);
+    if (!target) throw new StorageError(404, 'user not found');
+    this.db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
   }
 
   touchSync(userId: string): void {

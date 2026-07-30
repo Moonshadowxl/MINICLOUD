@@ -22,7 +22,22 @@ function pub(f: FileRow) {
 }
 
 export function fileRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): void {
-  const { storage, auth, events } = ctx;
+  const { storage, auth, events, search } = ctx;
+
+  /**
+   * Find anything, by name or by what's inside it.
+   * `q` is free text; results are ranked, capped, and scoped to the caller.
+   */
+  app.get('/search', { preHandler: requireAuth }, async (req) => {
+    const { q = '', limit } = req.query as { q?: string; limit?: string };
+    const n = Math.min(Math.max(Number(limit) || 30, 1), 100);
+    return { query: q, hits: search.search(req.userId, q, n) };
+  });
+
+  /** Rebuild this user's index (offered in Settings; also runs once after upgrading). */
+  app.post('/search/reindex', { preHandler: requireAuth }, async (req) => ({
+    indexed: await search.rebuild(req.userId),
+  }));
 
   app.get('/files', { preHandler: requireAuth }, async (req) => {
     const { path = '' } = req.query as { path?: string };
@@ -44,12 +59,20 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
 
   app.post('/files/mkdir', { preHandler: requireAuth }, async (req) => {
     const { path } = req.body as { path: string };
-    return { file: pub(storage.mkdir(req.userId, path)) };
+    const dir = storage.mkdir(req.userId, path);
+    await search.indexFile(req.userId, dir);
+    events.emit(req.userId, 'files-changed', { paths: [dir.path] });
+    return { file: pub(dir) };
   });
 
   app.post('/files/move', { preHandler: requireAuth }, async (req) => {
     const { from, to } = req.body as { from: string; to: string };
     storage.move(req.userId, from, to);
+    const moved = storage.stat(req.userId, to);
+    if (moved) {
+      search.reindexPaths(req.userId, [moved, ...storage.descendants(req.userId, moved.path)]);
+    }
+    events.emit(req.userId, 'files-changed', { paths: [from, to] });
     return { ok: true };
   });
 
@@ -73,7 +96,8 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
       if (!rel) throw new StorageError(400, 'file part missing a path');
       const content = await part.toBuffer();
       const full = basePath ? `${basePath}/${rel}` : rel;
-      await storage.writeFile(req.userId, full, content, { category, mtime: mtimes[rel] });
+      const file = await storage.writeFile(req.userId, full, content, { category, mtime: mtimes[rel] });
+      await search.indexFile(req.userId, file);
       saved.push(full);
     }
     await storage.cleanupStaleBlobs(req.userId);
@@ -90,7 +114,7 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
     const f = storage.byId(req.userId, id);
     if (f.is_dir) throw new StorageError(400, 'use /zip for folders');
     if (download !== undefined) {
-      reply.header('content-disposition', `attachment; filename="${encodeURIComponent(f.name)}"`);
+      reply.header('content-disposition', contentDisposition(f.name));
     }
     return sendFile(ctx, req, reply, req.userId, f);
   });
@@ -104,12 +128,23 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
     const prefixLen = f.is_dir ? f.path.length + 1 : f.path.length - f.name.length;
     reply
       .header('content-type', 'application/zip')
-      .header('content-disposition', `attachment; filename="${encodeURIComponent(f.name)}.zip"`);
+      .header('content-disposition', contentDisposition(`${f.name}.zip`));
+
     for (const target of targets) {
-      zip.addReadStream(
-        Readable.from(storage.readRange(req.userId, target, 0, Math.max(0, target.size - 1))),
-        target.path.slice(prefixLen) || target.name,
-      );
+      const name = target.path.slice(prefixLen) || target.name;
+      if (target.size === 0) {
+        zip.addBuffer(Buffer.alloc(0), name); // no chunks on disk to stream
+        continue;
+      }
+      // A read error here surfaces asynchronously inside yazl's stream. Left
+      // unhandled it becomes an uncaughtException and takes the whole server
+      // down mid-download; instead, fail just this entry and keep the archive.
+      const source = Readable.from(storage.readRange(req.userId, target, 0, target.size - 1));
+      source.on('error', (err) => {
+        req.log.error({ err, path: target.path }, 'zip: skipping unreadable file');
+        source.destroy();
+      });
+      zip.addReadStream(source, name);
     }
     zip.end();
     return reply.send(zip.outputStream);
@@ -119,6 +154,7 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
     const { id } = req.params as { id: string };
     const f = storage.byId(req.userId, id);
     storage.trash(req.userId, f.path);
+    search.removeSubtree(req.userId, f);
     events.emit(req.userId, 'files-changed', { paths: [f.path] });
     events.emit(req.userId, 'usage', storage.usage(req.userId));
     return { ok: true };
@@ -131,13 +167,20 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
   app.post('/files/:id/restore', { preHandler: requireAuth }, async (req) => {
     const { id } = req.params as { id: string };
     storage.restore(req.userId, id);
-    events.emit(req.userId, 'files-changed', {});
+    const f = storage.byId(req.userId, id);
+    for (const entry of [f, ...storage.descendants(req.userId, f.path)]) {
+      await search.indexFile(req.userId, entry);
+    }
+    events.emit(req.userId, 'files-changed', { paths: [f.path] });
+    events.emit(req.userId, 'usage', storage.usage(req.userId));
     return { ok: true };
   });
 
   app.delete('/files/:id/purge', { preHandler: requireAuth }, async (req) => {
     const { id } = req.params as { id: string };
+    const f = storage.byId(req.userId, id);
     await storage.purge(req.userId, id);
+    search.removeSubtree(req.userId, f);
     events.emit(req.userId, 'usage', storage.usage(req.userId));
     return { ok: true };
   });
@@ -151,7 +194,9 @@ export function fileRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
     const { id, versionId } = req.params as { id: string; versionId: string };
     storage.restoreVersion(req.userId, id, versionId);
     await storage.cleanupStaleBlobs(req.userId);
+    await search.indexFile(req.userId, storage.byId(req.userId, id));
     events.emit(req.userId, 'files-changed', {});
+    events.emit(req.userId, 'usage', storage.usage(req.userId));
     return { ok: true };
   });
 
@@ -187,6 +232,16 @@ export async function sendFile(
   }
   reply.header('content-length', end - start + 1);
   return reply.send(Readable.from(ctx.storage.readRange(ownerUserId, f, start, end)));
+}
+
+/**
+ * RFC 6266 / RFC 5987 attachment header. The old version percent-encoded the name
+ * *inside* the quoted string, so "my notes.txt" downloaded as "my%20notes.txt".
+ * Plain ASCII goes in `filename`, anything else rides in `filename*`.
+ */
+export function contentDisposition(name: string): string {
+  const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 }
 
 function parseRange(header: string | undefined, size: number): { start: number; end: number } | null {

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { Ctx } from '../app.js';
+import { tokenFrom, type Ctx } from '../app.js';
 import { StorageError } from '../storage.js';
 
 type Guard = (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -23,12 +23,28 @@ export function authRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
 
   const cookies = (req: FastifyRequest) => (req.cookies ?? {}) as Record<string, string | undefined>;
 
+  /**
+   * Only ever take the fields we mean to accept from a request body. Spreading the
+   * raw body into createUser let any caller set `isOwner` and `quotaBytes` — i.e.
+   * any signed-in guest could mint themselves an owner account.
+   */
+  const profileFields = (body: unknown) => {
+    const b = (body ?? {}) as Record<string, unknown>;
+    return {
+      username: String(b.username ?? ''),
+      displayName: typeof b.displayName === 'string' ? b.displayName : undefined,
+      password: String(b.password ?? ''),
+      pin: typeof b.pin === 'string' && b.pin !== '' ? b.pin : undefined,
+      color: typeof b.color === 'string' ? b.color : undefined,
+    };
+  };
+
   /** First run: create the owner profile. Only works while no users exist. */
   app.post('/auth/setup', async (req, reply) => {
     if (auth.userCount() > 0) throw new StorageError(409, 'already set up');
-    const body = req.body as { username: string; displayName?: string; password: string; pin?: string };
-    const user = auth.createUser({ ...body, isOwner: true });
-    const session = auth.loginPassword(body.username, body.password, deviceName(req));
+    const fields = profileFields(req.body);
+    const user = auth.createUser({ ...fields, isOwner: true });
+    const session = auth.loginPassword(fields.username, fields.password, deviceName(req));
     setSessionCookies(reply, user.id, session.deviceToken, session.accessToken);
     return { user, accessToken: session.accessToken, deviceToken: session.deviceToken };
   });
@@ -96,10 +112,31 @@ export function authRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
     return { user: auth.toPublic(user), lastSync: auth.lastSync(req.userId) };
   });
 
-  /** Add another profile (any signed-in user can, PS5-style, capped at maxUsers). */
-  app.post('/auth/users', { preHandler: requireAuth }, async (req) => {
-    const body = req.body as { username: string; displayName?: string; password: string; pin?: string; color?: string };
-    return { user: auth.createUser(body) };
+  /**
+   * Add another profile, capped at maxUsers. Two ways in:
+   *   - signed in as the owner, or
+   *   - from the welcome screen (nobody signed in) by supplying the owner's password.
+   *
+   * The second path is what makes the "Add user" tile work at all: it lives on the
+   * signed-out welcome screen, so requiring a session made it a guaranteed 401 and
+   * left the server permanently stuck at one profile.
+   */
+  app.post('/auth/users', async (req) => {
+    const token = tokenFrom(req);
+    const session = token ? auth.verifyAccess(token) : null;
+    if (!session?.isOwner) {
+      const { ownerPassword } = (req.body ?? {}) as { ownerPassword?: string };
+      if (!ownerPassword) throw new StorageError(401, "the owner's password is required to add a profile");
+      auth.assertOwnerPassword(ownerPassword);
+    }
+    return { user: auth.createUser(profileFields(req.body)) };
+  });
+
+  /** Remove a profile and everything it stored. Owner only, and never yourself. */
+  app.delete('/auth/users/:id', { preHandler: requireAuth }, async (req) => {
+    const { id } = req.params as { id: string };
+    await ctx.storage.deleteUserData(id, () => auth.deleteUser(req.userId, id));
+    return { ok: true };
   });
 
   app.post('/auth/pin/set', { preHandler: requireAuth }, async (req) => {
@@ -115,8 +152,8 @@ export function authRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard): 
   });
 
   app.post('/auth/quota', { preHandler: requireAuth }, async (req) => {
-    const body = req.body as { userId: string; quotaBytes: number | null };
-    auth.setQuota(req.userId, body.userId, body.quotaBytes);
+    const body = (req.body ?? {}) as { userId?: string; quotaBytes?: unknown };
+    auth.setQuota(req.userId, String(body.userId ?? ''), body.quotaBytes);
     return { ok: true };
   });
 

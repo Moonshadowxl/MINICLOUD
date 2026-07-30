@@ -54,6 +54,7 @@ export function uploadRoutes(app: FastifyInstance, ctx: Ctx, requireAuth: Guard)
     const { id } = req.params as { id: string };
     const file = storage.completeUpload(req.userId, id);
     await storage.cleanupStaleBlobs(req.userId);
+    await ctx.search.indexFile(req.userId, file);
     auth.touchSync(req.userId);
     events.emit(req.userId, 'files-changed', { paths: [file.path] });
     events.emit(req.userId, 'usage', storage.usage(req.userId));

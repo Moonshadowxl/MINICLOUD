@@ -30,7 +30,12 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
   useEffect(() => {
     if (kind !== 'text') return;
     if (entry.size > 1024 * 1024) { setTooBig(true); return; }
-    fetch(src).then((r) => r.text()).then(setText).catch(() => setText('(could not load)'));
+    let live = true;
+    fetch(src)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((t) => live && setText(t))
+      .catch(() => live && setText('(could not load this file)'));
+    return () => { live = false; };
   }, [kind, src, entry.size]);
 
   return (
@@ -48,7 +53,7 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
           {kind === 'image' && <img src={src} alt={entry.name} />}
           {kind === 'text' && (
             tooBig ? (
-              <p style={{ padding: 16 }}>This file is large — <a href={`${src}?download`} download>download it</a> instead.</p>
+              <p className="viewer-note">This file is large — <a href={`${src}?download`} download>download it</a> instead.</p>
             ) : text === null ? (
               <div className="skeleton" style={{ height: 200 }} />
             ) : (
@@ -58,7 +63,7 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
             )
           )}
           {kind === 'other' && (
-            <p style={{ padding: 16 }}>
+            <p className="viewer-note">
               No preview for this type — <a href={`${src}?download`} download>download {entry.name}</a>.
             </p>
           )}

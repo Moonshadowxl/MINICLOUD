@@ -34,6 +34,16 @@ export default function Files() {
 
   useEffect(() => { setEntries(null); load(); }, [load]);
 
+  // Search results link here as /files/<folder>?open=<id> — pop the viewer on that
+  // file once the folder has loaded, then drop the param so a refresh is clean.
+  const openId = new URLSearchParams(location.search).get('open');
+  useEffect(() => {
+    if (!openId || !entries) return;
+    const hit = entries.find((e) => e.id === openId);
+    if (hit) setViewing(hit);
+    navigate(location.pathname, { replace: true });
+  }, [openId, entries, navigate, location.pathname]);
+
   const go = (p: string) => navigate(`/files/${p.split('/').map(encodeURIComponent).join('/')}`);
 
   const doUpload = async (items: { file: File; relPath: string }[], category?: string) => {
@@ -166,7 +176,7 @@ export default function Files() {
           <div className="big">🗂️</div>
           <h3>Nothing here yet</h3>
           <p>Drop files anywhere on this page — or drop a whole folder.</p>
-          <p style={{ color: 'var(--ink-faint)' }}>
+          <p className="faint">
             Even an entire repo works: <code>node_modules</code>, <code>.git</code> and build folders are skipped automatically.
           </p>
         </div>
@@ -182,7 +192,7 @@ export default function Files() {
                   tabIndex={0}
                   onClick={() => (e.isDir ? go(e.path) : setViewing(e))}
                   onKeyDown={(ev) => ev.key === 'Enter' && (e.isDir ? go(e.path) : setViewing(e))}
-                >
+              >
                   {e.name}
                 </div>
                 <div className="meta">{e.isDir ? 'Folder' : fmtBytes(e.size)}</div>

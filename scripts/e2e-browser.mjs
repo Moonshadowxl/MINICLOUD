@@ -98,6 +98,34 @@ await fetch(`${BASE}/api/apps/${appId}`, {
 const pub = await fetch(`${BASE}/s/e2e-site/`);
 check('public serve loads', pub.status === 200 && (await pub.text()).includes('hello from e2e'));
 
+console.log('search: command palette');
+await page.goto(`${BASE}/`);
+await page.waitForSelector('.usage-figure');
+await page.keyboard.press('Control+k');
+await page.waitForSelector('.palette');
+check('⌘K opens the palette', true);
+await page.fill('.cp-input', 'minicloud');
+await page.waitForSelector('.cp-row', { timeout: 8000 });
+check('content search finds a phrase inside a file',
+  (await page.locator('.cp-row', { hasText: 'ideas.md' }).count()) > 0);
+check('the matched span is highlighted', (await page.locator('.cp-snippet mark').count()) > 0);
+await page.screenshot({ path: OUT + '10-palette.png' });
+await page.keyboard.press('Enter');
+await page.waitForSelector('.modal', { timeout: 8000 });
+check('enter jumps straight to the file', (await page.locator('.modal h3').textContent()).includes('ideas.md'));
+await page.screenshot({ path: OUT + '11-palette-jump.png' });
+await page.keyboard.press('Escape');
+
+console.log('zip of a folder holding an empty file (used to kill the server)');
+await upload('projects/site', '.gitkeep', '');
+const siteId = (await fetch(`${BASE}/api/files/stat?path=${encodeURIComponent('projects/site')}`, {
+  headers: { cookie: cookieHeader },
+}).then((r) => r.json())).file.id;
+const zipRes = await fetch(`${BASE}/api/files/${siteId}/zip`, { headers: { cookie: cookieHeader } });
+const zipBytes = new Uint8Array(await zipRes.arrayBuffer());
+check('zip streams instead of crashing', zipRes.status === 200 && zipBytes[0] === 0x50 && zipBytes[1] === 0x4b);
+check('server still alive after the zip', (await fetch(`${BASE}/api/health`)).ok);
+
 console.log('profile picker + PIN unlock');
 await page.goto(BASE);
 await page.click('button:has-text("Switch user")');
@@ -106,7 +134,9 @@ await page.screenshot({ path: OUT + '06-welcome.png' });
 await page.click('.profile');
 await page.waitForSelector('.pin-grid');
 await page.screenshot({ path: OUT + '07-pin.png' });
-for (const d of USER.pin) await page.click(`.pin-key:has-text("${d}")`);
+for (const d of USER.pin) await page.click(`.pin-key[aria-label="${d}"]`);
+check('a 4-digit PIN is not auto-submitted', (await page.locator('.greeting h1').count()) === 0);
+await page.click('.pin-key[aria-label="confirm PIN"]');
 await page.locator('.greeting h1').waitFor({ timeout: 8000 });
 check('PIN unlock works from the pad', true);
 
@@ -115,10 +145,27 @@ await page.waitForSelector('.usage-figure');
 await page.click('button:has-text("Switch user")');
 await page.click('.profile');
 await page.waitForSelector('.pin-grid');
-for (const d of '9999') await page.click(`.pin-key:has-text("${d}")`);
+for (const d of '9999') await page.click(`.pin-key[aria-label="${d}"]`);
+await page.click('.pin-key[aria-label="confirm PIN"]');
 await page.waitForSelector('.pin-dots.error', { timeout: 8000 });
 check('wrong PIN triggers error state', true);
 await page.screenshot({ path: OUT + '08-pin-error.png' });
+
+console.log('add a profile from the welcome screen');
+await page.click('button:has-text("Back")');
+await page.waitForSelector('.profiles');
+await page.click('.profile-add');
+await page.waitForSelector('#un');
+await page.fill('#un', 'friend');
+await page.fill('#dn', 'Friend');
+await page.fill('#pw2', 'friend-pass');
+await page.fill('#ownerpw', USER.password);
+await page.screenshot({ path: OUT + '12-add-profile.png' });
+await page.click('button:has-text("Add profile")');
+await page.waitForSelector('.profiles', { timeout: 8000 });
+check('a second profile can actually be created',
+  (await page.locator('.profile-name', { hasText: 'Friend' }).count()) === 1);
+await page.screenshot({ path: OUT + '13-two-profiles.png' });
 
 console.log('mobile viewport');
 const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });

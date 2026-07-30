@@ -8,14 +8,18 @@ export interface Entry {
   mime: string; category: string; mtime: number | null; createdAt: number; deletedAt: number | null;
 }
 export interface Usage {
-  used: number; quota: number; poolUsed: number; poolTotal: number;
+  used: number; liveUsed: number; quota: number; poolUsed: number; poolTotal: number;
   breakdown: Record<string, number>; trashBytes: number; lastSync: number | null;
 }
 export interface ServedApp {
   id: string; name: string; rootPath: string; visibility: 'public' | 'private'; createdAt: number; urls: string[];
 }
+export interface SearchHit {
+  fileId: string; path: string; name: string; isDir: boolean;
+  size: number; mime: string; mtime: number | null; snippet: string | null;
+}
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
@@ -64,8 +68,16 @@ export const fmtAgo = (t: number | null): string => {
 
 // ---------- uploads ----------
 
-/** Folders we skip when a whole codebase is dropped in (the .miniignore defaults). */
-export const MINIIGNORE = ['node_modules', '.git', 'dist', 'build', '.next', '.cache', '__pycache__', '.DS_Store'];
+/**
+ * Folders we skip when a whole codebase is dropped in (the .miniignore defaults).
+ * Keep in sync with the same list in agent/src/config.ts — the two run in
+ * different workspaces, and a folder skipped by one but not the other shows up
+ * as a phantom upload on the next sync.
+ */
+export const MINIIGNORE = [
+  'node_modules', '.git', 'dist', 'build', '.next', '.cache',
+  '__pycache__', '.DS_Store', '.minicloud-trash',
+];
 
 export function ignored(relPath: string): boolean {
   return relPath.split('/').some((part) => MINIIGNORE.includes(part));
@@ -128,18 +140,46 @@ export async function uploadFiles(
       method: 'POST',
       body: JSON.stringify({ path: fullPath, size: f.file.size, mtime: f.file.lastModified, category: opts.category }),
     });
+
+    // The server has always supported resuming; the browser never used it, so one
+    // dropped chunk on flaky wifi threw the whole multi-GB upload away. Ask what
+    // already landed, send only the gaps, and retry each chunk before giving up.
+    const { received } = await api<{ received: number[] }>(`/uploads/${up.id}`);
+    const have = new Set(received);
+    const bytesDone = () => Math.min(f.file.size, have.size * up.chunkSize);
+    p.done = bytesDone();
+    report();
+
     for (let c = 0; c < up.chunkCount; c++) {
-      const blob = f.file.slice(c * up.chunkSize, (c + 1) * up.chunkSize);
-      const res = await fetch(`/api/uploads/${up.id}/chunks/${c}`, {
-        method: 'PUT',
-        headers: { 'content-type': 'application/octet-stream' },
-        body: blob,
+      if (have.has(c)) continue;
+      await withRetry(async () => {
+        const res = await fetch(`/api/uploads/${up.id}/chunks/${c}`, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/octet-stream' },
+          body: f.file.slice(c * up.chunkSize, (c + 1) * up.chunkSize),
+        });
+        if (!res.ok) throw new ApiError(res.status, `chunk ${c} of ${f.relPath} failed`);
       });
-      if (!res.ok) throw new ApiError(res.status, `chunk ${c} failed`);
-      p.done = Math.min(f.file.size, (c + 1) * up.chunkSize);
+      have.add(c);
+      p.done = bytesDone();
       report();
     }
     await api(`/uploads/${up.id}/complete`, { method: 'POST' });
+    p.done = p.total;
+    report();
+  }
+}
+
+/** Retry a transient failure a few times with backoff; 4xx is never retried. */
+async function withRetry(fn: () => Promise<void>, attempts = 4): Promise<void> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      if (i >= attempts || (status >= 400 && status < 500)) throw err;
+      await new Promise((r) => setTimeout(r, 400 * 2 ** (i - 1)));
+    }
   }
 }
 

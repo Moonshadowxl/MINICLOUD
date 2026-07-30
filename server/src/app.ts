@@ -8,6 +8,7 @@ import { jwtSecret, loadOrCreateMasterKey } from './crypto.js';
 import { Storage, StorageError } from './storage.js';
 import { Auth } from './auth.js';
 import { EventBus } from './events.js';
+import { SearchIndex } from './search.js';
 import { authRoutes } from './routes/auth.js';
 import { fileRoutes } from './routes/files.js';
 import { uploadRoutes } from './routes/uploads.js';
@@ -19,6 +20,7 @@ export interface Ctx {
   storage: Storage;
   auth: Auth;
   events: EventBus;
+  search: SearchIndex;
 }
 
 declare module 'fastify' {
@@ -34,7 +36,7 @@ export function buildCtx(overrides: Partial<Config> = {}): Ctx {
   const masterKey = loadOrCreateMasterKey(config.keysDir);
   const storage = new Storage(db, config, masterKey);
   const auth = new Auth(db, config, storage, jwtSecret(masterKey));
-  return { config, db, storage, auth, events: new EventBus() };
+  return { config, db, storage, auth, events: new EventBus(), search: new SearchIndex(db, storage) };
 }
 
 /** Reads the access token from Authorization: Bearer or the mc_token cookie. */
