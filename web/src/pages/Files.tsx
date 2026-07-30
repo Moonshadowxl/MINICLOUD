@@ -272,8 +272,8 @@ export default function Files() {
                   className="icon-btn"
                   href={e.isDir ? `/api/files/${e.id}/zip` : `/api/files/${e.id}/content?download`}
                   download={e.isDir ? undefined : e.name}
-                  aria-label={e.isDir ? `Withdraw ${e.name} as a zip` : `Withdraw a copy of ${e.name}`}
-                  title={e.isDir ? 'Withdraw as zip' : 'Withdraw a copy'}
+                  aria-label={e.isDir ? `Download ${e.name} as a zip` : `Download ${e.name}`}
+                  title={e.isDir ? 'Download as zip' : 'Download'}
                 >
                   <WithdrawIcon size={15} />
                 </a>

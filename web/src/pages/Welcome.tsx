@@ -35,9 +35,14 @@ export default function Welcome() {
     setAdmitted({ sub: greetingFor(user.displayName).sub });
     // short, and skippable: the greeting itself belongs to the chamber, not to a splash
     const t = setTimeout(() => setUser(user), 950);
-    const skip = () => { clearTimeout(t); setUser(user); };
-    window.addEventListener('keydown', skip, { once: true });
-    window.addEventListener('pointerdown', skip, { once: true });
+    const skip = () => {
+      clearTimeout(t);
+      window.removeEventListener('keydown', skip);
+      window.removeEventListener('pointerdown', skip);
+      setUser(user);
+    };
+    window.addEventListener('keydown', skip);
+    window.addEventListener('pointerdown', skip);
   };
 
   const pick = (p: PublicUser) => {

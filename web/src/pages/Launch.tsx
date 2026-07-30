@@ -3,6 +3,7 @@ import { api, type Entry, type ServedApp } from '../api';
 import { CHAMBERS } from '../accession';
 import { useToast } from '../state';
 import { useSheet } from '../useSheet';
+import { ConfirmSheet } from '../components/Ask';
 import {
   AlarmIcon, ArchiveIcon, CheckIcon, CloseIcon, CopyIcon, IntoIcon, IssueIcon, OpenWorldIcon,
   SealIcon, ShelfIcon, UpIcon,
@@ -16,13 +17,14 @@ import {
 export default function Launch() {
   const [apps, setApps] = useState<ServedApp[] | null>(null);
   const [issuing, setIssuing] = useState(false);
+  const [recalling, setRecalling] = useState<ServedApp | null>(null);
   const toast = useToast();
 
   const load = () => api<{ apps: ServedApp[] }>('/apps').then((r) => setApps(r.apps)).catch(() => setApps([]));
   useEffect(() => { load(); }, []);
 
   const recall = async (a: ServedApp) => {
-    if (!confirm(`Return "${a.name}" to the shelf? Its links stop working. The files are kept.`)) return;
+    setRecalling(null);
     await api(`/apps/${a.id}`, { method: 'DELETE' });
     toast(`${a.name} is back on the shelf — files kept`);
     load();
@@ -101,7 +103,7 @@ export default function Launch() {
                 >
                   {a.visibility === 'public' ? <SealIcon size={15} /> : <OpenWorldIcon size={15} />}
                 </button>
-                <button className="icon-btn danger" onClick={() => recall(a)} aria-label={`Return ${a.name} to the shelf`} title="Return to the shelf">
+                <button className="icon-btn danger" onClick={() => setRecalling(a)} aria-label={`Return ${a.name} to the shelf`} title="Return to the shelf">
                   <CloseIcon size={15} />
                 </button>
               </div>
@@ -111,6 +113,23 @@ export default function Launch() {
       )}
 
       {issuing && <IssueSheet onClose={() => setIssuing(false)} onDone={() => { setIssuing(false); load(); }} />}
+
+      {recalling && (
+        <ConfirmSheet
+          title="Return it to the shelf?"
+          note={recalling.name}
+          danger
+          cta="Return it"
+          onCancel={() => setRecalling(null)}
+          onConfirm={() => recall(recalling)}
+          body={
+            <p style={{ margin: 0 }}>
+              Its links stop working straight away and anyone holding one gets nothing. The
+              files stay exactly where they are — you can issue it again whenever you like.
+            </p>
+          }
+        />
+      )}
     </>
   );
 }

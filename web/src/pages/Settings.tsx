@@ -3,6 +3,7 @@ import { api, fmtBytes, type Entry, type PublicUser } from '../api';
 import { CHAMBERS, depositorCode } from '../accession';
 import { useSession, useToast } from '../state';
 import { AlarmIcon, KeyIcon, RestoreIcon, ThawIcon } from '../components/Icons';
+import { AskSheet, ConfirmSheet } from '../components/Ask';
 
 /**
  * CH·04 — the deposit agreement. Clause by clause, in the order that matters: the master
@@ -159,6 +160,7 @@ function SecurityClause() {
 }
 
 function DeviceClause() {
+  const [asking, setAsking] = useState(false);
   return (
     <div className="clause-split">
       <p style={{ margin: 0 }}>
@@ -167,14 +169,29 @@ function DeviceClause() {
         in with your password again. Do it on anything shared or borrowed.
       </p>
       <div>
-        <button className="btn btn-alarm btn-sm" onClick={async () => {
-          if (!confirm('Forget this device? Your quick code stops working here until you sign in with your password again.')) return;
-          await api('/auth/forget-device', { method: 'POST' });
-          location.href = '/';
-        }}>
+        <button className="btn btn-alarm btn-sm" onClick={() => setAsking(true)}>
           <AlarmIcon size={14} /> Forget this device
         </button>
       </div>
+      {asking && (
+        <ConfirmSheet
+          title="Forget this device?"
+          danger
+          cta="Forget it"
+          onCancel={() => setAsking(false)}
+          onConfirm={async () => {
+            setAsking(false);
+            await api('/auth/forget-device', { method: 'POST' });
+            location.href = '/';
+          }}
+          body={
+            <p style={{ margin: 0 }}>
+              Your quick code stops working here. You will need your password to get back in,
+              and signing in with it will trust this device again.
+            </p>
+          }
+        />
+      )}
     </div>
   );
 }
@@ -185,15 +202,16 @@ function DepositorsClause() {
   const load = () => api<{ profiles: PublicUser[] }>('/auth/profiles').then((r) => setProfiles(r.profiles)).catch(() => setProfiles([]));
   useEffect(() => { load(); }, []);
 
-  const setQuota = async (p: PublicUser) => {
-    const gb = prompt(`How many GB for ${p.displayName}? Leave empty to share the pool.`);
-    if (gb === null) return;
+  const [quotaFor, setQuotaFor] = useState<PublicUser | null>(null);
+
+  const setQuota = async (p: PublicUser, gb: string) => {
+    setQuotaFor(null);
     try {
       await api('/auth/quota', {
         method: 'POST',
-        body: JSON.stringify({ userId: p.id, quotaBytes: gb.trim() === '' ? null : Number(gb) * 1024 ** 3 }),
+        body: JSON.stringify({ userId: p.id, quotaBytes: gb === '' ? null : Number(gb) * 1024 ** 3 }),
       });
-      toast('Quota updated');
+      toast(gb === '' ? `${p.displayName} shares the pool` : `${p.displayName} is capped at ${gb} GB`);
     } catch (e) { toast((e as Error).message, true); }
   };
 
@@ -210,7 +228,7 @@ function DepositorsClause() {
                 <div className="t">{p.displayName}{p.isOwner && ' — keyholder'}</div>
                 <div className="s">{depositorCode(p.username)} · @{p.username}{p.hasPin ? ' · code set' : ''}</div>
               </div>
-              <button className="btn btn-quiet btn-sm" onClick={() => setQuota(p)}>Quota</button>
+              <button className="btn btn-quiet btn-sm" onClick={() => setQuotaFor(p)}>Quota</button>
             </div>
           ))}
         </div>
@@ -218,6 +236,19 @@ function DepositorsClause() {
       <p className="fine" style={{ fontSize: '0.84rem', color: 'var(--rime-3)', marginTop: 14, marginBottom: 0 }}>
         New depositors are added from the portal, up to six chambers.
       </p>
+      {quotaFor && (
+        <AskSheet
+          title={`Space for ${quotaFor.displayName}`}
+          note="How much of the rack they may fill"
+          label="Cap in GB"
+          hint="Leave it empty and they share the whole pool with everyone else."
+          placeholder="e.g. 50"
+          inputMode="numeric"
+          cta="Set the cap"
+          onCancel={() => setQuotaFor(null)}
+          onDone={(gb) => setQuota(quotaFor, gb)}
+        />
+      )}
     </>
   );
 }
@@ -225,6 +256,7 @@ function DepositorsClause() {
 function ThawClause() {
   const toast = useToast();
   const [entries, setEntries] = useState<Entry[] | null>(null);
+  const [purging, setPurging] = useState<Entry | null>(null);
   const load = () => api<{ entries: Entry[] }>('/files/trash').then((r) => setEntries(r.entries)).catch(() => setEntries([]));
   useEffect(() => { load(); }, []);
 
@@ -263,18 +295,35 @@ function ThawClause() {
                   <RestoreIcon size={15} />
                 </button>
                 <button className="icon-btn danger" title="Purge for good" aria-label={`Purge ${e.name} for good`}
-                  onClick={async () => {
-                    if (!confirm(`Purge "${e.name}" for good? This cannot be undone.`)) return;
-                    await api(`/files/${e.id}/purge`, { method: 'DELETE' });
-                    toast('Purged for good');
-                    load();
-                  }}>
+                  onClick={() => setPurging(e)}>
                   <AlarmIcon size={15} />
                 </button>
               </div>
             </div>
           ))}
         </div>
+      )}
+      {purging && (
+        <ConfirmSheet
+          title="Purge it for good?"
+          note={purging.name}
+          danger
+          cta="Purge it"
+          onCancel={() => setPurging(null)}
+          onConfirm={async () => {
+            const e = purging;
+            setPurging(null);
+            await api(`/files/${e.id}/purge`, { method: 'DELETE' });
+            toast('Purged for good');
+            load();
+          }}
+          body={
+            <p style={{ margin: 0 }}>
+              This deletes the sealed chunks from the disk. There is no thaw shelf after this
+              one and no version to fall back on — it is gone.
+            </p>
+          }
+        />
       )}
     </>
   );

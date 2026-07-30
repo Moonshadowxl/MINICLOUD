@@ -75,7 +75,6 @@ export default function Home() {
             </div>
             <p className="reg" style={{ marginTop: 14, letterSpacing: '0.1em' }}>
               One crate = {fmtBytes(usage.quota / SLOTS)}
-              {usage.trashBytes > 0 && <> · {fmtBytes(usage.trashBytes)} waiting on the thaw shelf</>}
             </p>
           </>
         ) : (
