@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react';
 import { api, fmtBytes, type Entry, type PublicUser } from '../api';
 import { useSession, useToast } from '../state';
+import { Rule } from '../icons';
 
 export default function Settings() {
   const { user } = useSession();
   return (
     <>
-      <div className="main-head"><h1>Settings</h1></div>
-      <div className="panel-grid" style={{ marginTop: 0 }}>
+      <div className="page-head"><h1>Settings</h1></div>
+      <div className="page"><div className="panel-grid">
         <SecurityPanel />
         <SearchPanel />
         {user?.isOwner && <ProfilesPanel />}
         <TrashPanel />
         <AboutPanel />
-      </div>
+      </div></div>
     </>
   );
 }
@@ -25,12 +26,12 @@ function SecurityPanel() {
 
   return (
     <section className="panel">
-      <h3>Security</h3>
+      <h3>Password &amp; PIN</h3>
       <form onSubmit={async (e) => {
         e.preventDefault();
         try {
           await api('/auth/password/set', { method: 'POST', body: JSON.stringify({ currentPassword: pw.current, newPassword: pw.next }) });
-          toast('Password changed ✓');
+          toast('Password changed');
           setPw({ current: '', next: '' });
         } catch (err) { toast((err as Error).message, true); }
       }}>
@@ -43,14 +44,14 @@ function SecurityPanel() {
           <input className="input" type="password" placeholder="New password (min 6 chars)" value={pw.next}
             autoComplete="new-password" onChange={(e) => setPw({ ...pw, next: e.target.value })} />
         </div>
-        <button className="btn btn-ghost btn-sm" disabled={!pw.current || pw.next.length < 6}>Update password</button>
+        <button className="btn btn-sm" disabled={!pw.current || pw.next.length < 6}>Update password</button>
       </form>
 
       <form style={{ marginTop: 20 }} onSubmit={async (e) => {
         e.preventDefault();
         try {
           await api('/auth/pin/set', { method: 'POST', body: JSON.stringify({ currentPassword: pin.current, pin: pin.next || null }) });
-          toast(pin.next ? 'PIN updated ✓' : 'PIN removed');
+          toast(pin.next ? 'PIN updated' : 'PIN removed');
           setPin({ current: '', next: '' });
         } catch (err) { toast((err as Error).message, true); }
       }}>
@@ -63,16 +64,16 @@ function SecurityPanel() {
           <input className="input" inputMode="numeric" maxLength={6} placeholder="New PIN (4-6 digits)" value={pin.next}
             onChange={(e) => setPin({ ...pin, next: e.target.value.replace(/\D/g, '') })} />
         </div>
-        <button className="btn btn-ghost btn-sm" disabled={!pin.current}>Update PIN</button>
+        <button className="btn btn-sm" disabled={!pin.current}>Update PIN</button>
       </form>
 
-      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+      <div className="panel-note">
         <button className="btn btn-danger btn-sm" onClick={async () => {
           if (!confirm('Forget this device? PIN unlock stops working here until you sign in with your password again.')) return;
           await api('/auth/forget-device', { method: 'POST' });
           location.href = '/';
         }}>Forget this device</button>
-        <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)', margin: '8px 0 0' }}>
+        <p className="hint">
           Removes this device's trusted status — do this on shared or borrowed computers.
         </p>
       </div>
@@ -101,7 +102,7 @@ function ProfilesPanel() {
         method: 'POST',
         body: JSON.stringify({ userId: p.id, quotaBytes: trimmed === '' ? null : Number(trimmed) * 1024 ** 3 }),
       });
-      toast('Quota updated ✓');
+      toast('Quota updated');
     } catch (e) { toast((e as Error).message, true); }
   };
 
@@ -126,7 +127,7 @@ function ProfilesPanel() {
               <div className="meta">@{p.username}{p.hasPin ? ' · PIN set' : ''}</div>
             </div>
             <div className="actions">
-              <button className="btn btn-ghost btn-sm" onClick={() => setQuota(p)}>Quota</button>
+              <button className="btn btn-sm" onClick={() => setQuota(p)}>Quota</button>
               {p.id !== user?.id && (
                 <button className="btn btn-danger btn-sm" onClick={() => remove(p)}>Remove</button>
               )}
@@ -150,7 +151,7 @@ function SearchPanel() {
     setBusy(true);
     try {
       const r = await api<{ indexed: number }>('/search/reindex', { method: 'POST' });
-      toast(`Reindexed ${r.indexed} files ✓`);
+      toast(`Reindexed ${r.indexed} files`);
     } catch (e) {
       toast((e as Error).message, true);
     } finally {
@@ -160,15 +161,15 @@ function SearchPanel() {
 
   return (
     <section className="panel">
-      <h3>Search</h3>
+      <h3>Search index</h3>
       <p className="soft" style={{ margin: '0 0 12px' }}>
-        Press <kbd>⌘K</kbd> / <kbd>Ctrl</kbd>+<kbd>K</kbd> anywhere to search your files by name
-        or by what's inside them. The index updates itself as you upload.
+        Press <kbd>⌘K</kbd> / <kbd>Ctrl</kbd>+<kbd>K</kbd> anywhere to search your files by name or
+        by what's inside them. The index keeps itself current as you upload.
       </p>
-      <button className="btn btn-ghost btn-sm" onClick={reindex} disabled={busy}>
-        {busy ? 'Reindexing…' : 'Rebuild search index'}
+      <button className="btn btn-sm" onClick={reindex} disabled={busy}>
+        <Rule size={14} /> {busy ? 'Reindexing…' : 'Rebuild the index'}
       </button>
-      <p className="hint" style={{ margin: '8px 0 0' }}>
+      <p className="hint">
         Only needed if results look stale — say, after restoring a backup by hand.
       </p>
     </section>
@@ -189,7 +190,7 @@ function TrashPanel() {
     <section className="panel">
       <h3>Trash</h3>
       {entries === null ? <div className="skeleton" style={{ height: 60 }} /> : tops.length === 0 ? (
-        <p style={{ color: 'var(--ink-soft)', margin: 0 }}>Trash is empty.</p>
+        <p className="soft">Nothing in the trash.</p>
       ) : (
         <div className="rows">
           {tops.map((e) => (
@@ -199,8 +200,8 @@ function TrashPanel() {
                 <div className="meta">{e.path}{!e.isDir && ` · ${fmtBytes(e.size)}`}</div>
               </div>
               <div className="actions">
-                <button className="btn btn-ghost btn-sm" onClick={async () => {
-                  try { await api(`/files/${e.id}/restore`, { method: 'POST' }); toast('Restored ✓'); load(); }
+                <button className="btn btn-sm" onClick={async () => {
+                  try { await api(`/files/${e.id}/restore`, { method: 'POST' }); toast('Restored'); load(); }
                   catch (err) { toast((err as Error).message, true); }
                 }}>Restore</button>
                 <button className="btn btn-danger btn-sm" onClick={async () => {
@@ -221,13 +222,13 @@ function TrashPanel() {
 function AboutPanel() {
   return (
     <section className="panel">
-      <h3>Your server</h3>
+      <h3>This machine</h3>
       <p style={{ margin: '0 0 8px' }}>
         MiniCloud runs on your own machine. To reach it away from home, install{' '}
         <a href="https://tailscale.com" target="_blank" rel="noreferrer">Tailscale</a> on the server and your
         devices — see <code>docs/</code> in the repo for the walkthrough (plus SSH and auto-start).
       </p>
-      <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ink-faint)' }}>
+      <p className="hint">
         Back up <code>data/keys/master.key</code> somewhere safe — without it the encrypted files can't be read.
       </p>
     </section>

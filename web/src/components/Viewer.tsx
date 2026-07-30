@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fmtBytes, type Entry } from '../api';
+import { Down } from '../icons';
 
 const TEXT_EXT = new Set([
   'txt', 'md', 'json', 'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'css', 'html', 'htm', 'xml', 'svg',
@@ -41,35 +42,35 @@ export default function Viewer({ entry, onClose }: { entry: Entry; onClose: () =
   return (
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`modal${kind === 'video' || kind === 'text' ? ' wide' : ''}`} role="dialog" aria-label={entry.name}>
-        <h3 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name}</span>
-          <span style={{ fontSize: '0.8rem', color: 'var(--ink-faint)', fontWeight: 400, flexShrink: 0 }}>
-            {fmtBytes(entry.size)}
-          </span>
-        </h3>
-        <div className="viewer-body">
-          {kind === 'video' && <video src={src} controls autoPlay />}
-          {kind === 'audio' && <audio src={src} controls autoPlay />}
-          {kind === 'image' && <img src={src} alt={entry.name} />}
-          {kind === 'text' && (
-            tooBig ? (
-              <p className="viewer-note">This file is large — <a href={`${src}?download`} download>download it</a> instead.</p>
-            ) : text === null ? (
-              <div className="skeleton" style={{ height: 200 }} />
-            ) : (
-              <pre className="code">
-                {text.split('\n').map((ln, i) => <span className="ln" key={i}>{ln || ' '}</span>)}
-              </pre>
-            )
-          )}
-          {kind === 'other' && (
-            <p className="viewer-note">
-              No preview for this type — <a href={`${src}?download`} download>download {entry.name}</a>.
-            </p>
-          )}
+        <div className="modal-head">
+          <h3>{entry.name}</h3>
+          <span className="measure">{fmtBytes(entry.size)}</span>
+        </div>
+        <div className="modal-body">
+          <div className="viewer-body">
+            {kind === 'video' && <video src={src} controls autoPlay />}
+            {kind === 'audio' && <audio src={src} controls autoPlay />}
+            {kind === 'image' && <img src={src} alt={entry.name} />}
+            {kind === 'text' && (
+              tooBig ? (
+                <p className="viewer-note">This file is large — <a href={`${src}?download`} download>download it</a> instead.</p>
+              ) : text === null ? (
+                <div className="skeleton" style={{ height: 220 }} />
+              ) : (
+                <pre className="code">
+                  {text.split('\n').map((ln, i) => <span className="ln" key={i}>{ln || ' '}</span>)}
+                </pre>
+              )
+            )}
+            {kind === 'other' && (
+              <p className="viewer-note">
+                No preview for this kind of file — <a href={`${src}?download`} download>download {entry.name}</a>.
+              </p>
+            )}
+          </div>
         </div>
         <div className="modal-actions">
-          <a className="btn btn-ghost" href={`${src}?download`} download={entry.name}>Download</a>
+          <a className="btn" href={`${src}?download`} download={entry.name}><Down size={14} /> Download</a>
           <button className="btn btn-primary" onClick={onClose}>Close</button>
         </div>
       </div>

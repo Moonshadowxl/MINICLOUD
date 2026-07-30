@@ -16,7 +16,7 @@ product — design serves the task. One exception: the Welcome screen is a conso
 login is Restrained.
 
 ## Platform
-web (installable PWA)
+web
 
 ## Voice
 Calm, personal, a little warm. It greets you by name ("Good evening, Moon" / late night:

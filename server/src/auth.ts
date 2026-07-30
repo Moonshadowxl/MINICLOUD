@@ -6,7 +6,11 @@ import type { Storage } from './storage.js';
 import type { Config } from './config.js';
 
 const ACCESS_TTL = 15 * 60; // seconds
-const COLORS = ['#7c5cff', '#00c2a8', '#ff5c8a', '#ffb020', '#3aa0ff', '#9be15d'];
+/**
+ * Observer inks. Printed-plate colours, all in one saturation family so no
+ * profile shouts louder than another and none fights the iron the app is set in.
+ */
+const COLORS = ['#2f4a5c', '#7a2f24', '#2c5f5a', '#8a6220', '#463d63', '#4d5f2e'];
 
 /**
  * Largest quota we will store. SQLite happily holds a full 64-bit integer, but

@@ -53,8 +53,8 @@ check('greeting splash shows the display name', (await greeting.textContent()).i
 await page.screenshot({ path: OUT + '02-greeting.png' });
 
 console.log('dashboard');
-await page.waitForSelector('.usage-figure', { timeout: 8000 });
-check('usage hero rendered', true);
+await page.waitForSelector('.reading-figure', { timeout: 8000 });
+check('station reading rendered', true);
 await page.screenshot({ path: OUT + '03-home.png' });
 
 console.log('uploads (via API, same endpoints the drag-drop uses)');
@@ -100,7 +100,7 @@ check('public serve loads', pub.status === 200 && (await pub.text()).includes('h
 
 console.log('search: command palette');
 await page.goto(`${BASE}/`);
-await page.waitForSelector('.usage-figure');
+await page.waitForSelector('.reading-figure');
 await page.keyboard.press('Control+k');
 await page.waitForSelector('.palette');
 check('⌘K opens the palette', true);
@@ -129,9 +129,9 @@ check('server still alive after the zip', (await fetch(`${BASE}/api/health`)).ok
 console.log('profile picker + PIN unlock');
 await page.goto(BASE);
 await page.click('button:has-text("Switch user")');
-await page.waitForSelector('.profiles');
+await page.waitForSelector('.observers');
 await page.screenshot({ path: OUT + '06-welcome.png' });
-await page.click('.profile');
+await page.click('.observer');
 await page.waitForSelector('.pin-grid');
 await page.screenshot({ path: OUT + '07-pin.png' });
 for (const d of USER.pin) await page.click(`.pin-key[aria-label="${d}"]`);
@@ -141,9 +141,9 @@ await page.locator('.greeting h1').waitFor({ timeout: 8000 });
 check('PIN unlock works from the pad', true);
 
 console.log('wrong-PIN shake');
-await page.waitForSelector('.usage-figure');
+await page.waitForSelector('.reading-figure');
 await page.click('button:has-text("Switch user")');
-await page.click('.profile');
+await page.click('.observer');
 await page.waitForSelector('.pin-grid');
 for (const d of '9999') await page.click(`.pin-key[aria-label="${d}"]`);
 await page.click('.pin-key[aria-label="confirm PIN"]');
@@ -153,8 +153,8 @@ await page.screenshot({ path: OUT + '08-pin-error.png' });
 
 console.log('add a profile from the welcome screen');
 await page.click('button:has-text("Back")');
-await page.waitForSelector('.profiles');
-await page.click('.profile-add');
+await page.waitForSelector('.observers');
+await page.click('.observer-add');
 await page.waitForSelector('#un');
 await page.fill('#un', 'friend');
 await page.fill('#dn', 'Friend');
@@ -162,15 +162,15 @@ await page.fill('#pw2', 'friend-pass');
 await page.fill('#ownerpw', USER.password);
 await page.screenshot({ path: OUT + '12-add-profile.png' });
 await page.click('button:has-text("Add profile")');
-await page.waitForSelector('.profiles', { timeout: 8000 });
+await page.waitForSelector('.observers', { timeout: 8000 });
 check('a second profile can actually be created',
-  (await page.locator('.profile-name', { hasText: 'Friend' }).count()) === 1);
+  (await page.locator('.observer-name', { hasText: 'Friend' }).count()) === 1);
 await page.screenshot({ path: OUT + '13-two-profiles.png' });
 
 console.log('mobile viewport');
 const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
 await mobile.goto(BASE);
-await mobile.waitForSelector('.profiles');
+await mobile.waitForSelector('.observers');
 await mobile.screenshot({ path: OUT + '09-mobile.png' });
 check('mobile welcome renders', true);
 

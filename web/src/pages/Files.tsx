@@ -3,16 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { api, fmtBytes, uploadFiles, type Entry, type UploadProgress } from '../api';
 import { useToast } from '../state';
 import Viewer from '../components/Viewer';
-
-const ico = (e: Entry) => {
-  if (e.isDir) return '📁';
-  if (e.mime.startsWith('video/')) return '🎬';
-  if (e.mime.startsWith('audio/')) return '🎵';
-  if (e.mime.startsWith('image/')) return '🖼️';
-  if (e.mime === 'text/html') return '🌐';
-  if (e.category === 'projects') return '🧩';
-  return '📄';
-};
+import { Down, Folder, Plate, Plus, glyphFor } from '../icons';
 
 export default function Files() {
   const location = useLocation();
@@ -54,7 +45,7 @@ export default function Files() {
         onProgress: (p) => setUploads(p.filter((x) => x.done < x.total)),
       });
       setUploads([]);
-      toast(`Uploaded ${items.length === 1 ? items[0].relPath : `${items.length} files`} ✓`);
+      toast(`Collected ${items.length === 1 ? items[0].relPath : `${items.length} files`}`);
       load();
     } catch (e) {
       setUploads([]);
@@ -73,17 +64,16 @@ export default function Files() {
       file: f,
       relPath: (f.webkitRelativePath || f.name).replaceAll('\\', '/'),
     }));
-    // whole folder drop = a project (codebase) upload
     doUpload(items, 'projects');
   };
 
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(0);
-    const entries = Array.from(e.dataTransfer.items)
+    const dropped = Array.from(e.dataTransfer.items)
       .map((i) => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null))
       .filter(Boolean) as FileSystemEntry[];
-    if (entries.length === 0) return onPickFiles(e.dataTransfer.files);
+    if (dropped.length === 0) return onPickFiles(e.dataTransfer.files);
     const collected: { file: File; relPath: string }[] = [];
     let hasDir = false;
     const walk = async (entry: FileSystemEntry, prefix: string): Promise<void> => {
@@ -104,14 +94,16 @@ export default function Files() {
         for (const child of await readAll()) await walk(child, `${prefix}${entry.name}/`);
       }
     };
-    for (const entry of entries) await walk(entry, '');
+    for (const entry of dropped) await walk(entry, '');
     doUpload(collected, hasDir ? 'projects' : undefined);
   };
 
   const del = async (entry: Entry) => {
-    await api(`/files/${entry.id}`, { method: 'DELETE' });
-    toast(`Moved "${entry.name}" to trash`);
-    load();
+    try {
+      await api(`/files/${entry.id}`, { method: 'DELETE' });
+      toast(`Moved "${entry.name}" to the trash`);
+      load();
+    } catch (e) { toast((e as Error).message, true); }
   };
 
   const rename = async (entry: Entry) => {
@@ -129,6 +121,15 @@ export default function Files() {
     }
   };
 
+  const newFolder = async () => {
+    const name = prompt('Folder name');
+    if (!name) return;
+    try {
+      await api('/files/mkdir', { method: 'POST', body: JSON.stringify({ path: path ? `${path}/${name}` : name }) });
+      load();
+    } catch (e) { toast((e as Error).message, true); }
+  };
+
   const crumbs = path ? path.split('/') : [];
 
   return (
@@ -139,7 +140,7 @@ export default function Files() {
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
     >
-      <div className="main-head">
+      <div className="page-head">
         <nav className="breadcrumbs" aria-label="Path">
           <button onClick={() => go('')}>Files</button>
           {crumbs.map((c, i) => (
@@ -149,16 +150,9 @@ export default function Files() {
             </span>
           ))}
         </nav>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button className="btn btn-ghost btn-sm" onClick={async () => {
-            const name = prompt('Folder name');
-            if (!name) return;
-            try {
-              await api('/files/mkdir', { method: 'POST', body: JSON.stringify({ path: path ? `${path}/${name}` : name }) });
-              load();
-            } catch (e) { toast((e as Error).message, true); }
-          }}>New folder</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => folderInput.current?.click()}>Upload folder</button>
+        <div className="actions-inline">
+          <button className="btn btn-sm" onClick={newFolder}><Plus size={14} /> New folder</button>
+          <button className="btn btn-sm" onClick={() => folderInput.current?.click()}>Upload folder</button>
           <button className="btn btn-primary btn-sm" onClick={() => fileInput.current?.click()}>Upload files</button>
         </div>
       </div>
@@ -167,60 +161,68 @@ export default function Files() {
       {/* @ts-expect-error webkitdirectory is non-standard but universal */}
       <input ref={folderInput} type="file" webkitdirectory="" hidden onChange={(e) => { onPickFolder(e.target.files); e.target.value = ''; }} />
 
-      {entries === null ? (
-        <div className="rows">
-          {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 46, marginBottom: 8 }} />)}
-        </div>
-      ) : entries.length === 0 ? (
-        <div className="empty">
-          <div className="big">🗂️</div>
-          <h3>Nothing here yet</h3>
-          <p>Drop files anywhere on this page — or drop a whole folder.</p>
-          <p className="faint">
-            Even an entire repo works: <code>node_modules</code>, <code>.git</code> and build folders are skipped automatically.
-          </p>
-        </div>
-      ) : (
-        <div className="rows">
-          {entries.map((e) => (
-            <div className="row" key={e.id}>
-              <span className="file-ico" aria-hidden>{ico(e)}</span>
-              <div className="grow">
-                <div
-                  className="name"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => (e.isDir ? go(e.path) : setViewing(e))}
-                  onKeyDown={(ev) => ev.key === 'Enter' && (e.isDir ? go(e.path) : setViewing(e))}
-              >
-                  {e.name}
+      <div className="page">
+        {entries === null ? (
+          <div className="rows">
+            {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 44, marginBottom: 6 }} />)}
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="empty">
+            <Plate size={32} className="empty-sym" />
+            <h3>{path ? 'This folder is empty' : 'The collection is empty'}</h3>
+            <p>Drop files anywhere on this page — or drop a whole folder.</p>
+            <p className="hint">
+              An entire repository works: <code>node_modules</code>, <code>.git</code> and build
+              folders are left behind automatically.
+            </p>
+          </div>
+        ) : (
+          <div className="rows">
+            {entries.map((e) => {
+              const Sym = glyphFor(e);
+              return (
+                <div className="row" key={e.id}>
+                  <span className={`file-sym${e.isDir ? ' dir' : ''}`} aria-hidden><Sym size={20} /></span>
+                  <div className="grow">
+                    <div
+                      className="name"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => (e.isDir ? go(e.path) : setViewing(e))}
+                      onKeyDown={(ev) => ev.key === 'Enter' && (e.isDir ? go(e.path) : setViewing(e))}
+                    >
+                      {e.name}
+                    </div>
+                    <div className="meta">{e.isDir ? 'folder' : fmtBytes(e.size)}</div>
+                  </div>
+                  <div className="actions">
+                    {e.isDir ? (
+                      <a className="btn btn-sm" href={`/api/files/${e.id}/zip`} download><Down size={13} /> Zip</a>
+                    ) : (
+                      <a className="btn btn-sm" href={`/api/files/${e.id}/content?download`} download={e.name}><Down size={13} /> Get</a>
+                    )}
+                    <button className="btn btn-sm" onClick={() => rename(e)}>Rename</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => del(e)}>Trash</button>
+                  </div>
                 </div>
-                <div className="meta">{e.isDir ? 'Folder' : fmtBytes(e.size)}</div>
-              </div>
-              <div className="actions">
-                {e.isDir ? (
-                  <a className="btn btn-ghost btn-sm" href={`/api/files/${e.id}/zip`} download>Zip</a>
-                ) : (
-                  <a className="btn btn-ghost btn-sm" href={`/api/files/${e.id}/content?download`} download={e.name}>Get</a>
-                )}
-                <button className="btn btn-ghost btn-sm" onClick={() => rename(e)}>Rename</button>
-                <button className="btn btn-danger btn-sm" onClick={() => del(e)}>Trash</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {uploads.length > 0 && (
         <div className="uploads-tray">
-          <h4>Uploading {uploads.length} file{uploads.length > 1 ? 's' : ''}…</h4>
-          {uploads.slice(0, 5).map((u) => (
-            <div className="u-row" key={u.name}>
-              <span className="u-name">{u.name}</span>
-              <span className="progress"><div style={{ width: `${(u.done / Math.max(1, u.total)) * 100}%` }} /></span>
-            </div>
-          ))}
-          {uploads.length > 5 && <div className="u-row">…and {uploads.length - 5} more</div>}
+          <h4>Collecting {uploads.length} file{uploads.length > 1 ? 's' : ''}</h4>
+          <div className="u-body">
+            {uploads.slice(0, 5).map((u) => (
+              <div className="u-row" key={u.name}>
+                <span className="u-name">{u.name}</span>
+                <span className="progress"><div style={{ transform: `scaleX(${u.done / Math.max(1, u.total)})` }} /></span>
+              </div>
+            ))}
+            {uploads.length > 5 && <div className="u-row hint">…and {uploads.length - 5} more</div>}
+          </div>
         </div>
       )}
 

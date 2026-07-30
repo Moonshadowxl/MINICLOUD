@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Back, Check } from '../icons';
 
 const MIN_PIN = 4;
 const MAX_PIN = 6;
@@ -11,7 +12,7 @@ const MAX_PIN = 6;
  * the moment you reached 4 digits, which meant anyone with a 5- or 6-digit PIN
  * submitted a wrong prefix on every attempt and locked themselves out. Now only
  * a full 6 digits (the maximum — nothing more can be typed) submits by itself;
- * shorter PINs are confirmed with Enter or the ✓ key.
+ * shorter PINs are confirmed with Enter or the confirm key.
  */
 export default function PinPad({ onSubmit }: { onSubmit: (pin: string) => Promise<boolean> }) {
   const [pin, setPin] = useState('');
@@ -53,11 +54,11 @@ export default function PinPad({ onSubmit }: { onSubmit: (pin: string) => Promis
     return () => window.removeEventListener('keydown', onKey);
   }, [press]);
 
-  const keys = [
+  const keys: { key: string; label: React.ReactNode; aria: string }[] = [
     ...['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => ({ key: d, label: d, aria: d })),
-    { key: 'del', label: '⌫', aria: 'delete' },
+    { key: 'del', label: <Back size={19} />, aria: 'delete' },
     { key: '0', label: '0', aria: '0' },
-    { key: 'ok', label: '✓', aria: 'confirm PIN' },
+    { key: 'ok', label: <Check size={19} />, aria: 'confirm PIN' },
   ];
 
   return (

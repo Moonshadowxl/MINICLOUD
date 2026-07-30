@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type Entry, type ServedApp } from '../api';
 import { useToast } from '../state';
+import { Back, Broadcast, Document, Folder } from '../icons';
 
 /**
  * Launch: serve any stored folder (or single html file) at a Vercel-style URL.
@@ -34,25 +35,27 @@ export default function Launch() {
 
   return (
     <>
-      <div className="main-head">
+      <div className="page-head">
         <h1>Launch</h1>
-        <button className="btn btn-primary" onClick={() => setServing(true)}>Serve something</button>
+        <button className="btn btn-primary" onClick={() => setServing(true)}>Serve a folder</button>
       </div>
 
+      <div className="page">
       {apps === null ? (
-        <div className="skeleton" style={{ height: 120 }} />
+        <div className="skeleton" style={{ height: 110 }} />
       ) : apps.length === 0 ? (
         <div className="empty">
-          <div className="big">🚀</div>
-          <h3>Nothing live yet</h3>
-          <p>Upload a folder with an <code>index.html</code>, then serve it here — it gets a URL like a real deploy.</p>
-          <button className="btn btn-primary" onClick={() => setServing(true)}>Serve something</button>
+          <Broadcast size={32} className="empty-sym" />
+          <h3>Nothing on the air</h3>
+          <p>Any stored folder with an <code>index.html</code> can be given a real URL and served
+             straight from this machine — public to anyone, or private to the people here.</p>
+          <button className="btn btn-primary" onClick={() => setServing(true)}>Serve a folder</button>
         </div>
       ) : (
         <div className="rows">
           {apps.map((a) => (
             <div className="row" key={a.id}>
-              <span className="file-ico" aria-hidden>🚀</span>
+              <span className="file-sym dir" aria-hidden><Broadcast size={20} /></span>
               <div className="grow">
                 <div className="name static">{a.name}</div>
                 <div className="meta">
@@ -67,8 +70,8 @@ export default function Launch() {
               </div>
               <span className={`badge ${a.visibility}`}>{a.visibility}</span>
               <div className="actions">
-                <button className="btn btn-ghost btn-sm" onClick={() => copy(a.urls[0])}>Copy URL</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => flip(a)}>
+                <button className="btn btn-sm" onClick={() => copy(a.urls[0])}>Copy URL</button>
+                <button className="btn btn-sm" onClick={() => flip(a)}>
                   Make {a.visibility === 'public' ? 'private' : 'public'}
                 </button>
                 <button className="btn btn-danger btn-sm" onClick={() => stop(a)}>Stop</button>
@@ -77,6 +80,7 @@ export default function Launch() {
           ))}
         </div>
       )}
+      </div>
 
       {serving && <ServeDialog onClose={() => setServing(false)} onDone={() => { setServing(false); load(); }} />}
     </>
@@ -107,7 +111,7 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
         method: 'POST',
         body: JSON.stringify({ name, path, visibility }),
       });
-      toast(`"${r.app.name}" is live ✓`);
+      toast(`"${r.app.name}" is on the air`);
       onDone();
     } catch (e) {
       setError((e as Error).message);
@@ -117,37 +121,38 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   return (
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-label="Serve an app">
-        <h3>Serve an app</h3>
+      <div className="modal" role="dialog" aria-label="Serve a folder">
+        <div className="modal-head"><h3>Serve a folder</h3></div>
+        <div className="modal-body">
 
         <div className="field">
           <label>Pick what to serve {browsePath && <>— in <code>{browsePath}</code></>}</label>
-          <div style={{ border: '1px solid var(--line)', borderRadius: 10, maxHeight: 180, overflow: 'auto' }}>
+          <div className="picker">
             {browsePath && (
-              <button className="btn btn-ghost btn-sm" style={{ margin: 6 }}
+              <button className="btn btn-sm" style={{ margin: 6 }}
                 onClick={() => setBrowsePath(browsePath.split('/').slice(0, -1).join('/'))}>
-                ← up
+                <Back size={13} /> up
               </button>
             )}
             {entries.map((e) => (
               <div key={e.id}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', cursor: 'pointer',
-                  background: path === e.path ? 'var(--brand-soft)' : undefined,
+                  background: path === e.path ? 'var(--iron-wash)' : undefined,
                 }}
                 onClick={() => { setPath(e.path); if (!name) setName(e.name.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')); }}
                 onDoubleClick={() => e.isDir && setBrowsePath(e.path)}
               >
-                <span>{e.isDir ? '📁' : '🌐'}</span>
+                <span className="file-sym" aria-hidden>{e.isDir ? <Folder size={18} /> : <Document size={18} />}</span>
                 <span className="grow">{e.name}</span>
                 {e.isDir && (
-                  <button className="btn btn-ghost btn-sm" onClick={(ev) => { ev.stopPropagation(); setBrowsePath(e.path); }}>
+                  <button className="btn btn-sm" onClick={(ev) => { ev.stopPropagation(); setBrowsePath(e.path); }}>
                     open
                   </button>
                 )}
               </div>
             ))}
-            {entries.length === 0 && <div style={{ padding: 12, color: 'var(--ink-faint)' }}>No folders or html files here.</div>}
+            {entries.length === 0 && <div className="hint" style={{ padding: 12 }}>No folders or html files here.</div>}
           </div>
           {path && <div className="hint soft">Serving: <code>{path}</code></div>}
         </div>
@@ -156,7 +161,7 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <label htmlFor="app-name">Name (becomes the URL)</label>
           <input id="app-name" className="input" value={name} placeholder="my-app"
             onChange={(e) => setName(e.target.value.toLowerCase())} />
-          {name && <div className="hint">→ /s/{name}/ · http://{name}.mini/</div>}
+          {name && <div className="hint measure">/s/{name}/ · {name}.mini</div>}
         </div>
 
         <div className="field">
@@ -164,17 +169,18 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <div style={{ display: 'flex', gap: 8 }}>
             {(['private', 'public'] as const).map((v) => (
               <button key={v} type="button"
-                className={`btn btn-sm ${visibility === v ? 'btn-primary' : 'btn-ghost'}`}
+                className={`btn btn-sm ${visibility === v ? 'btn-primary' : ''}`}
                 onClick={() => setVisibility(v)}>
-                {v === 'private' ? 'Private (you only)' : 'Public'}
+                {v === 'private' ? 'Private — people here' : 'Public — anyone'}
               </button>
             ))}
           </div>
         </div>
 
         {error && <div className="form-error">{error}</div>}
+        </div>
         <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" disabled={!path || !name || busy} onClick={submit}>
             {busy ? 'Going live…' : 'Go live'}
           </button>

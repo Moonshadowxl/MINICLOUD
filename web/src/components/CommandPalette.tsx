@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, fmtBytes, type SearchHit } from '../api';
+import { Lens, glyphFor } from '../icons';
 
 /**
  * Search everything, from anywhere: ⌘K / Ctrl-K.
@@ -54,13 +55,6 @@ function Snippet({ text }: { text: string }) {
   );
 }
 
-const iconFor = (h: SearchHit) => {
-  if (h.isDir) return '📁';
-  if (h.mime.startsWith('video/')) return '🎬';
-  if (h.mime.startsWith('audio/')) return '🎵';
-  if (h.mime.startsWith('image/')) return '🖼️';
-  return '📄';
-};
 
 export default function CommandPalette({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('');
@@ -120,17 +114,14 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
     <div className="backdrop cp-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="palette" role="dialog" aria-modal="true" aria-label="Search">
         <div className="cp-input-row">
-          <svg className="cp-search-ico" width="17" height="17" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
-          </svg>
+          <Lens size={17} className="cp-search-ico" />
           <input
             ref={inputRef}
             className="cp-input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search files and code…"
+            placeholder="Search names and contents…"
             aria-label="Search files and code"
             autoComplete="off"
             spellCheck={false}
@@ -141,7 +132,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
         <div className="cp-results" ref={listRef} role="listbox" aria-label="Results">
           {hits === null ? (
             <div className="cp-hint">
-              <p>Search by name, or by what's inside — function names, notes, config values.</p>
+              <p>Search by name, or by what's inside — a function you wrote, a line in a note, a value in a config.</p>
             </div>
           ) : hits.length === 0 ? (
             <div className="cp-hint">
@@ -159,7 +150,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
                 onMouseMove={() => setActive(i)}
                 onClick={() => open(h)}
               >
-                <span className="cp-ico" aria-hidden>{iconFor(h)}</span>
+                <span className="cp-sym" aria-hidden>{(() => { const S = glyphFor(h); return <S size={18} />; })()}</span>
                 <span className="cp-body">
                   <span className="cp-name">
                     {h.name}

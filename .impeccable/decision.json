@@ -1,0 +1,66 @@
+{
+  "title": "Choose the visual world for MiniCloud",
+  "question": "The roll assigned Cloud Atlas Plate. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Cloud Atlas Plate",
+      "kicker": "THE ROLL",
+      "lineage": "Luke Howard's cloud classification and the WMO International Cloud Atlas — scientific specimen plates, not weather apps",
+      "thesis": "Your files are a collection under observation, not rows in a storage console. MiniCloud reads the name literally in the one way nobody expects: cloud *classification*, not cloud computing. It refuses the SaaS storage dashboard (sidebar, donut, card grid) and refuses its predictable opposite, the black terminal.",
+      "palette": ["#f4f1e8", "#1d2b33", "#8c3b26", "#3f6b7d"],
+      "materials": ["plate paper", "letterpress caption", "hairline rule", "sky-cover notation"],
+      "viewport": "A ruled plate: station header with the observer's name and local time, then capacity read as sky cover in eighths — a real filled-fraction glyph, not a progress bar — with the four genera (Files, Media, Projects, Apps) as numbered specimens beneath, each with its plate number and measured extent.",
+      "risk": "Renders as beige academic wallpaper if the ink and the notation are set timidly; the saturated end (oxblood, slate-blue overprint) has to carry it, not the paper.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-phosphor-terminal-midnight-hero.webp"
+    },
+    {
+      "id": "challenger-gateboard",
+      "label": "Gate Board & Boarding Pass",
+      "kicker": "STRONGEST ALTERNATE",
+      "lineage": "airport departure boards and segmented boarding passes",
+      "thesis": "Files as a board that reranks in place — a changed row moves and stays lit until you have noticed it. Uploads are segmented passes with sequence numbers.",
+      "palette": ["#101418", "#f2f4f5", "#e8a317", "#c0392b"],
+      "materials": ["split-flap", "tabular figures", "monospaced scannable block"],
+      "viewport": "A live board of files ordered by recency, changed rows holding an alert colour.",
+      "risk": "A departure board is about imminent events, not a stored corpus. Wins on live upload and sync state; has no native carrier for capacity or for browsing 2,000 files of a codebase — which is most of this product.",
+      "hero": "https://impeccable.style/worlds/cards/vernacular-ephemera-boarding-pass-and-gate-board-hero.webp"
+    },
+    {
+      "id": "challenger-teletext",
+      "label": "Teletext Magazine",
+      "lineage": "broadcast teletext, 40x24 character grid",
+      "thesis": "Every view has a three-digit page number you key directly; the whole app is addressable from the number row.",
+      "palette": ["#000000", "#ffffff", "#ffff00", "#00ffff"],
+      "materials": ["bitmap face", "block mosaic", "character cell"],
+      "viewport": "A 40-column page with a counting header and cyan figures on black.",
+      "risk": "Fuses poorly here: it is black-ground, which the brief pinned against, and it is the predictable anti-SaaS move. Long file paths do not fit a 40-cell row.",
+      "hero": "https://impeccable.style/worlds/cards/broadcast-programming-teletext-service-hero.webp"
+    },
+    {
+      "id": "challenger-roster",
+      "label": "Character Goods Roster",
+      "lineage": "character goods catalogues — ranked mascots with name plates and birthdays",
+      "thesis": "Profiles as a roster of characters, each with its own ribbon colour and personal furniture.",
+      "palette": ["#f7e9ef", "#ffffff", "#f0a6ba", "#5b4b8a"],
+      "materials": ["flat fill", "white keyline", "rounded bubble face"],
+      "viewport": "A pastel grid of profile characters with ruled name plates.",
+      "risk": "Fuses poorly because a finite ranked roster cannot carry an unbounded file tree, and pastel mascots put an encrypted file server in a children's register.",
+      "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-character-goods-catalog-hero.webp"
+    }
+  ],
+  "canonCard": {
+    "id": "canon",
+    "label": "The category standard, played straight",
+    "kicker": "STANDING EXIT",
+    "lineage": "Dropbox / Google Drive / Synology DSM",
+    "thesis": "A conventional file-manager UI executed at a high craft level: left sidebar, breadcrumb, list with hover actions, a capacity bar, one accent colour.",
+    "palette": ["#ffffff", "#f6f7f9", "#1a1a1a", "#2563eb"],
+    "materials": ["neutral panel", "system stack", "hairline divider"],
+    "viewport": "Sidebar, breadcrumb, file rows, a capacity bar top-right.",
+    "risk": "It is what MiniCloud already is, and what every run would ship. Chosen deliberately it is a legitimate answer; chosen by default it is the rut."
+  },
+  "allowReroll": true,
+  "allowSteer": true,
+  "allowCanon": true
+}
