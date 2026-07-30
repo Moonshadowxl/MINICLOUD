@@ -31,17 +31,17 @@ const LINES: Record<Band, string[]> = {
   ],
   night: [
     'Moonlight, {name} 🌙',
-    'Late night, {name}? Your files kept watch',
-    'Still up, {name}? The cloud never sleeps',
+    'Late night, {name}? Everything held',
+    'Still up, {name}? The vault never warms',
     'Night shift, {name} 🌙',
   ],
 };
 
 const SUBS: Record<Band, string> = {
-  morning: 'Everything synced while you slept.',
-  afternoon: 'Your cloud is humming along.',
-  evening: 'All quiet in the cloud.',
-  night: 'Quiet hours — everything is safe.',
+  morning: 'Everything stayed sealed while you slept.',
+  afternoon: 'The chamber is cold and nothing has moved.',
+  evening: 'All quiet on the shelves.',
+  night: 'Quiet hours. Your work is under frost.',
 };
 
 export function greetingFor(name: string, date = new Date()): { title: string; sub: string; band: Band } {

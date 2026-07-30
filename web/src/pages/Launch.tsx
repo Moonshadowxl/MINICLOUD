@@ -1,63 +1,80 @@
 import { useEffect, useState } from 'react';
 import { api, type Entry, type ServedApp } from '../api';
+import { CHAMBERS } from '../accession';
 import { useToast } from '../state';
+import {
+  AlarmIcon, ArchiveIcon, CloseIcon, CopyIcon, IssueIcon, OpenWorldIcon, SealIcon, ShelfIcon, UpIcon,
+} from '../components/Icons';
 
 /**
- * Launch: serve any stored folder (or single html file) at a Vercel-style URL.
- * Private = only signed-in MiniCloud users; Public = anyone who can reach the server.
+ * CH·03 — the issue desk. An accession lifted out of cold storage and put where a browser
+ * can reach it: /s/<name>/ and http://<name>.mini/. Held means signed-in depositors only;
+ * issued means anyone who can reach the server. Stopping puts it back on the shelf.
  */
 export default function Launch() {
   const [apps, setApps] = useState<ServedApp[] | null>(null);
-  const [serving, setServing] = useState(false);
+  const [issuing, setIssuing] = useState(false);
   const toast = useToast();
 
   const load = () => api<{ apps: ServedApp[] }>('/apps').then((r) => setApps(r.apps)).catch(() => setApps([]));
   useEffect(() => { load(); }, []);
 
-  const stop = async (a: ServedApp) => {
+  const recall = async (a: ServedApp) => {
     await api(`/apps/${a.id}`, { method: 'DELETE' });
-    toast(`Stopped serving "${a.name}" — files kept`);
+    toast(`${a.name} is back on the shelf — files kept`);
     load();
   };
 
   const flip = async (a: ServedApp) => {
-    await api(`/apps/${a.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ visibility: a.visibility === 'public' ? 'private' : 'public' }),
-    });
+    const next = a.visibility === 'public' ? 'private' : 'public';
+    await api(`/apps/${a.id}`, { method: 'PATCH', body: JSON.stringify({ visibility: next }) });
+    toast(next === 'public' ? `${a.name} is open to anyone with the link` : `${a.name} is held — depositors only`);
     load();
   };
 
   const copy = (url: string) => {
-    navigator.clipboard.writeText(url).then(() => toast('URL copied'));
+    navigator.clipboard.writeText(url).then(() => toast('Link copied'));
   };
 
   return (
     <>
-      <div className="main-head">
-        <h1>Launch</h1>
-        <button className="btn btn-primary" onClick={() => setServing(true)}>Serve something</button>
+      <div className="ch-head">
+        <div className="titling">
+          <span className="reg num">{CHAMBERS.issue.no} · {CHAMBERS.issue.title}</span>
+          <h1>Issue desk</h1>
+        </div>
+        <div className="acts">
+          <button className="btn btn-portal" onClick={() => setIssuing(true)}>
+            <IssueIcon size={15} /> Issue an accession
+          </button>
+        </div>
       </div>
 
       {apps === null ? (
-        <div className="skeleton" style={{ height: 120 }} />
+        <div className="frosted" style={{ height: 140 }} />
       ) : apps.length === 0 ? (
-        <div className="empty">
-          <div className="big">🚀</div>
-          <h3>Nothing live yet</h3>
-          <p>Upload a folder with an <code>index.html</code>, then serve it here — it gets a URL like a real deploy.</p>
-          <button className="btn btn-primary" onClick={() => setServing(true)}>Serve something</button>
+        <div className="bare">
+          <span className="glyph"><IssueIcon size={38} /></span>
+          <h3>Nothing is out in the open</h3>
+          <p>
+            Deposit a folder with an <code>index.html</code> in it, then issue it here. It gets a real
+            URL and serves straight out of the chamber — nothing is copied or unsealed on disk.
+          </p>
+          <div className="after">
+            <button className="btn btn-portal btn-sm" onClick={() => setIssuing(true)}>
+              <IssueIcon size={14} /> Issue an accession
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="rows">
+        <div className="register">
           {apps.map((a) => (
-            <div className="row" key={a.id}>
-              <span className="file-ico" aria-hidden>🚀</span>
-              <div className="grow">
-                <div className="name" style={{ cursor: 'default' }}>{a.name}</div>
-                <div className="meta">
-                  from <code>{a.rootPath}</code> ·{' '}
-                  {a.urls.map((u, i) => (
+            <div className="entry" key={a.id} style={{ gridTemplateColumns: '34px minmax(0, 1fr) auto auto' }}>
+              <span className="form-ico"><span className={`lamp ${a.visibility === 'public' ? 'live' : 'hold'}`} /></span>
+              <div className="desc">
+                <div className="desc-name" style={{ cursor: 'default' }}>{a.name}</div>
+                <div className="acc num" style={{ marginTop: 3 }}>
+                  from {a.rootPath} · {a.urls.map((u, i) => (
                     <span key={u}>
                       {i > 0 && ' · '}
                       <a href={u} target="_blank" rel="noreferrer">{u}</a>
@@ -65,25 +82,38 @@ export default function Launch() {
                   ))}
                 </div>
               </div>
-              <span className={`badge ${a.visibility}`}>{a.visibility}</span>
-              <div className="actions">
-                <button className="btn btn-ghost btn-sm" onClick={() => copy(a.urls[0])}>Copy URL</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => flip(a)}>
-                  Make {a.visibility === 'public' ? 'private' : 'public'}
+              <span className={`stamp ${a.visibility === 'public' ? 'issued' : 'held'}`}>
+                {a.visibility === 'public' ? <OpenWorldIcon size={12} /> : <ArchiveIcon size={12} />}
+                {a.visibility === 'public' ? 'Issued' : 'Held'}
+              </span>
+              <div className="row-acts">
+                <button className="icon-btn" onClick={() => copy(a.urls[0])} aria-label={`Copy the link to ${a.name}`} title="Copy link">
+                  <CopyIcon size={15} />
                 </button>
-                <button className="btn btn-danger btn-sm" onClick={() => stop(a)}>Stop</button>
+                <button
+                  className="icon-btn"
+                  onClick={() => flip(a)}
+                  aria-label={a.visibility === 'public' ? `Hold ${a.name} — depositors only` : `Issue ${a.name} to anyone`}
+                  title={a.visibility === 'public' ? 'Hold — depositors only' : 'Issue to anyone'}
+                >
+                  {a.visibility === 'public' ? <SealIcon size={15} /> : <OpenWorldIcon size={15} />}
+                </button>
+                <button className="icon-btn danger" onClick={() => recall(a)} aria-label={`Return ${a.name} to the shelf`} title="Return to the shelf">
+                  <CloseIcon size={15} />
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {serving && <ServeDialog onClose={() => setServing(false)} onDone={() => { setServing(false); load(); }} />}
+      {issuing && <IssueSheet onClose={() => setIssuing(false)} onDone={() => { setIssuing(false); load(); }} />}
     </>
   );
 }
 
-function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+/** Issuing commits something to the open world, so it earns a protected, focused step. */
+function IssueSheet({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [path, setPath] = useState('');
   const [browsePath, setBrowsePath] = useState('');
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -99,6 +129,12 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
       .catch(() => setEntries([]));
   }, [browsePath]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const submit = async () => {
     setBusy(true);
     setError(null);
@@ -107,7 +143,7 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
         method: 'POST',
         body: JSON.stringify({ name, path, visibility }),
       });
-      toast(`"${r.app.name}" is live ✓`);
+      toast(`${r.app.name} is live`);
       onDone();
     } catch (e) {
       setError((e as Error).message);
@@ -117,66 +153,100 @@ function ServeDialog({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   return (
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-label="Serve an app">
-        <h3>Serve an app</h3>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label="Issue an accession">
+        <div className="sheet-head">
+          <div className="titling">
+            <h3>Issue an accession</h3>
+            <span className="reg reg-sm">Serve it out of the chamber at a real URL</span>
+          </div>
+          <button className="icon-btn" onClick={onClose} aria-label="Close"><CloseIcon size={18} /></button>
+        </div>
 
-        <div className="field">
-          <label>Pick what to serve {browsePath && <>— in <code>{browsePath}</code></>}</label>
-          <div style={{ border: '1px solid var(--line)', borderRadius: 10, maxHeight: 180, overflow: 'auto' }}>
-            {browsePath && (
-              <button className="btn btn-ghost btn-sm" style={{ margin: 6 }}
-                onClick={() => setBrowsePath(browsePath.split('/').slice(0, -1).join('/'))}>
-                ← up
-              </button>
-            )}
-            {entries.map((e) => (
-              <div key={e.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', cursor: 'pointer',
-                  background: path === e.path ? 'var(--brand-soft)' : undefined,
-                }}
-                onClick={() => { setPath(e.path); if (!name) setName(e.name.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')); }}
-                onDoubleClick={() => e.isDir && setBrowsePath(e.path)}
+        <div className="sheet-body">
+          <div className="field">
+            <label>What should be served{browsePath && <> — in {browsePath}</>}</label>
+            <div className="picker">
+              {browsePath && (
+                <button className="pick" onClick={() => setBrowsePath(browsePath.split('/').slice(0, -1).join('/'))}>
+                  <UpIcon size={15} />
+                  <span className="pn">Up one shelf</span>
+                </button>
+              )}
+              {entries.map((e) => (
+                <button
+                  key={e.id}
+                  className={`pick${path === e.path ? ' on' : ''}`}
+                  onClick={() => {
+                    setPath(e.path);
+                    if (!name) {
+                      setName(e.name.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, ''));
+                    }
+                  }}
+                  onDoubleClick={() => e.isDir && setBrowsePath(e.path)}
+                >
+                  {e.isDir ? <ShelfIcon size={15} /> : <OpenWorldIcon size={15} />}
+                  <span className="pn">{e.name}</span>
+                  {e.isDir && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="reg reg-sm"
+                      onClick={(ev) => { ev.stopPropagation(); setBrowsePath(e.path); }}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); setBrowsePath(e.path); } }}
+                    >
+                      Open
+                    </span>
+                  )}
+                </button>
+              ))}
+              {entries.length === 0 && (
+                <div style={{ padding: 14, color: 'var(--rime-3)', fontSize: '0.84rem' }}>
+                  No folders or html files on this shelf.
+                </div>
+              )}
+            </div>
+            {path && <span className="hint">Serving {path}</span>}
+          </div>
+
+          <div className="field">
+            <label htmlFor="app-name">Name — it becomes the URL</label>
+            <input id="app-name" className="input" value={name} placeholder="my-app"
+              onChange={(e) => setName(e.target.value.toLowerCase())} />
+            {name && <span className="hint num">/s/{name}/ · http://{name}.mini/</span>}
+          </div>
+
+          <div className="field">
+            <label>Who can open it</label>
+            <div className="choice">
+              <button
+                type="button"
+                className={`btn btn-sm ${visibility === 'private' ? 'btn-portal' : 'btn-quiet'}`}
+                onClick={() => setVisibility('private')}
               >
-                <span>{e.isDir ? '📁' : '🌐'}</span>
-                <span style={{ flex: 1 }}>{e.name}</span>
-                {e.isDir && (
-                  <button className="btn btn-ghost btn-sm" onClick={(ev) => { ev.stopPropagation(); setBrowsePath(e.path); }}>
-                    open
-                  </button>
-                )}
-              </div>
-            ))}
-            {entries.length === 0 && <div style={{ padding: 12, color: 'var(--ink-faint)' }}>No folders or html files here.</div>}
-          </div>
-          {path && <div style={{ fontSize: '0.84rem', color: 'var(--ink-soft)' }}>Serving: <code>{path}</code></div>}
-        </div>
-
-        <div className="field">
-          <label htmlFor="app-name">Name (becomes the URL)</label>
-          <input id="app-name" className="input" value={name} placeholder="my-app"
-            onChange={(e) => setName(e.target.value.toLowerCase())} />
-          {name && <div style={{ fontSize: '0.84rem', color: 'var(--ink-faint)' }}>→ /s/{name}/ · http://{name}.mini/</div>}
-        </div>
-
-        <div className="field">
-          <label>Who can open it?</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {(['private', 'public'] as const).map((v) => (
-              <button key={v} type="button"
-                className={`btn btn-sm ${visibility === v ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => setVisibility(v)}>
-                {v === 'private' ? 'Private (you only)' : 'Public'}
+                <ArchiveIcon size={14} /> Held
               </button>
-            ))}
+              <button
+                type="button"
+                className={`btn btn-sm ${visibility === 'public' ? 'btn-portal' : 'btn-quiet'}`}
+                onClick={() => setVisibility('public')}
+              >
+                <OpenWorldIcon size={14} /> Issued
+              </button>
+            </div>
+            <span className="hint">
+              {visibility === 'private'
+                ? 'Only signed-in depositors can open it.'
+                : 'Anyone who can reach this server can open it — no sign-in.'}
+            </span>
           </div>
+
+          {error && <div className="form-error" role="alert"><AlarmIcon size={15} /> {error}</div>}
         </div>
 
-        {error && <div style={{ color: 'var(--danger)', fontWeight: 550 }}>{error}</div>}
-        <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={!path || !name || busy} onClick={submit}>
-            {busy ? 'Going live…' : 'Go live'}
+        <div className="sheet-foot">
+          <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
+          <button className="btn btn-portal" disabled={!path || !name || busy} onClick={submit}>
+            <IssueIcon size={15} /> {busy ? 'Issuing…' : 'Issue it'}
           </button>
         </div>
       </div>

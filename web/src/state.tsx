@@ -46,9 +46,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="toasts" role="status" aria-live="polite">
+      {/* the day book: what the vault just recorded */}
+      <div className="log" role="status" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className={`toast${t.error ? ' error' : ''}`}>{t.text}</div>
+          <div key={t.id} className={`log-entry${t.error ? ' bad' : ''}`}>
+            <span className={`lamp ${t.error ? 'alarm' : 'live'}`} />
+            {t.text}
+          </div>
         ))}
       </div>
     </ToastCtx.Provider>

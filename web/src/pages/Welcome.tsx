@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type PublicUser } from '../api';
+import { depositorCode } from '../accession';
 import { greetingFor, isNight } from '../greetings';
 import { useClock, useSession } from '../state';
 import PinPad from '../components/PinPad';
+import { AlarmIcon, PlusIcon, SealIcon } from '../components/Icons';
 
 interface ProfilesResp { setupNeeded: boolean; maxUsers: number; profiles: PublicUser[] }
 
 /**
- * The console moment: clock top-left, wordmark, profile tiles (selected one highlighted),
- * "+" to add a user, PIN pad on pick, then the time-of-day greeting splash.
+ * THE PORTAL — the way into the vault, and the one drenched surface in the app.
+ * Light falls in from the entrance, the depositor plates hang in a row beneath it, and
+ * picking yours brings up the keypad. Admission is logged, then the chamber opens.
  */
 export default function Welcome() {
   const clock = useClock();
@@ -16,7 +19,7 @@ export default function Welcome() {
   const [data, setData] = useState<ProfilesResp | null>(null);
   const [selected, setSelected] = useState<PublicUser | null>(null);
   const [mode, setMode] = useState<'pick' | 'pin' | 'password' | 'setup' | 'add'>('pick');
-  const [greeting, setGreeting] = useState<{ title: string; sub: string } | null>(null);
+  const [admitted, setAdmitted] = useState<{ title: string; sub: string } | null>(null);
   const night = isNight();
 
   const load = () => api<ProfilesResp>('/auth/profiles').then((d) => {
@@ -27,10 +30,9 @@ export default function Welcome() {
 
   const finishing = useRef(false);
   const finish = (user: PublicUser) => {
-    if (finishing.current) return; // one splash, one timer — no stale setUser later
+    if (finishing.current) return; // one admission, one timer — no stale setUser later
     finishing.current = true;
-    setGreeting(greetingFor(user.displayName));
-    // let the splash play, then enter the app
+    setAdmitted(greetingFor(user.displayName));
     setTimeout(() => setUser(user), 1750);
   };
 
@@ -40,35 +42,48 @@ export default function Welcome() {
   };
 
   return (
-    <div className={`welcome${night ? ' night' : ''}`}>
-      <div className="welcome-top">
-        <span className="welcome-clock">{clock}</span>
-        <span className="wordmark" style={{ fontSize: '1.3rem' }}>
-          <span className="mini">MINI</span>CLOUD
+    <div className={`portal${night ? ' night' : ''}`}>
+      <div className="portal-top">
+        <span className="mark">
+          <span className="bolt" />
+          <span className="word">Mini<span className="dim">cloud</span></span>
+        </span>
+        <span className="portal-clock">
+          <span className="reg reg-sm">Local time</span>
+          <span className="t num">{clock}</span>
         </span>
       </div>
 
-      <div className="welcome-center">
+      <div className="portal-center">
         {mode === 'pick' && data && (
           <>
-            <h1 className="welcome-title">Who's here?</h1>
-            <div className="profiles">
+            <div className="portal-heading">
+              <h1>Who is depositing?</h1>
+              <span className="reg">The chamber stays sealed until someone signs in</span>
+            </div>
+            <div className="plates">
               {data.profiles.map((p) => (
                 <button
                   key={p.id}
-                  className={`profile${selected?.id === p.id ? ' selected' : ''}`}
+                  className={`plate${selected?.id === p.id ? ' on' : ''}`}
                   onClick={() => pick(p)}
                 >
-                  <span className="profile-tile" style={{ background: p.color }}>
-                    {p.displayName[0]?.toUpperCase()}
+                  <span className="plate-face" style={{ ['--plate-tint' as string]: p.color }}>
+                    <span className="plate-initial">{p.displayName[0]?.toUpperCase()}</span>
                   </span>
-                  <span className="profile-name">{p.displayName}</span>
+                  <span className="plate-tag">
+                    <span className="plate-name">{p.displayName}</span>
+                    <span className="plate-code num">{depositorCode(p.username)}</span>
+                  </span>
                 </button>
               ))}
               {data.profiles.length < data.maxUsers && (
-                <button className="profile profile-add" onClick={() => setMode('add')}>
-                  <span className="profile-tile">+</span>
-                  <span className="profile-name">Add user</span>
+                <button className="plate plate-new" onClick={() => { setSelected(null); setMode('add'); }}>
+                  <span className="plate-face"><PlusIcon size={26} /></span>
+                  <span className="plate-tag">
+                    <span className="plate-name">New depositor</span>
+                    <span className="plate-code">{data.maxUsers - data.profiles.length} places left</span>
+                  </span>
                 </button>
               )}
             </div>
@@ -98,11 +113,15 @@ export default function Welcome() {
         )}
       </div>
 
-      {greeting && (
-        <div className="greeting" aria-live="polite">
-          <div style={{ textAlign: 'center' }}>
-            <h1>{greeting.title}</h1>
-            <div className="sub">{greeting.sub}</div>
+      {admitted && (
+        <div className="admit" aria-live="polite">
+          <div className="admit-inner">
+            <span className="line">
+              <span className="lamp" />
+              <span className="reg reg-sm num">Admitted {clock} · chamber open</span>
+            </span>
+            <h1>{admitted.title}</h1>
+            <span className="sub">{admitted.sub}</span>
           </div>
         </div>
       )}
@@ -134,13 +153,20 @@ function PinUnlock({ user, onBack, onPassword, onDone }: {
   };
 
   return (
-    <div className="pinpad">
-      <h2>Hi {user.displayName} — your PIN</h2>
+    <div className="keypad">
+      <div className="keypad-head">
+        <h2>{user.displayName}</h2>
+        <span className="reg reg-sm">Enter your code</span>
+      </div>
       <PinPad onSubmit={submit} />
-      {error && <div style={{ color: 'var(--danger)', fontWeight: 550 }}>{error}</div>}
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button className="btn btn-ghost btn-sm" onClick={onBack}>Back</button>
-        <button className="btn btn-ghost btn-sm" onClick={onPassword}>Use password</button>
+      {error && (
+        <div className="form-error" role="alert" style={{ margin: 0 }}>
+          <AlarmIcon size={15} /> {error}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 9 }}>
+        <button className="btn btn-quiet btn-sm" onClick={onBack}>Back</button>
+        <button className="btn btn-quiet btn-sm" onClick={onPassword}>Use password</button>
       </div>
     </div>
   );
@@ -174,31 +200,34 @@ function PasswordLogin({ user, onBack, onDone }: {
   };
 
   return (
-    <form onSubmit={submit} style={{ width: 300 }}>
-      <h2 style={{ textAlign: 'center', marginBottom: 18 }}>Welcome back, {user.displayName}</h2>
+    <form onSubmit={submit} style={{ width: 'min(330px, 90vw)' }}>
+      <div className="portal-heading" style={{ marginBottom: 22 }}>
+        <h2>{user.displayName}</h2>
+        <span className="reg reg-sm">Sign in with your password</span>
+      </div>
       <div className="field">
         <label htmlFor="pw">Password</label>
         <input id="pw" ref={ref} className="input" type="password" value={password}
           onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
       </div>
-      {error && <div style={{ color: 'var(--danger)', marginBottom: 10, fontWeight: 550 }}>{error}</div>}
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button type="button" className="btn btn-ghost" onClick={onBack}>Back</button>
-        <button className="btn btn-primary" style={{ flex: 1 }} disabled={busy || !password}>
-          {busy ? 'Signing in…' : 'Sign in'}
+      {error && <div className="form-error" role="alert"><AlarmIcon size={15} /> {error}</div>}
+      <div style={{ display: 'flex', gap: 9 }}>
+        <button type="button" className="btn btn-quiet" onClick={onBack}>Back</button>
+        <button className="btn btn-portal" style={{ flex: 1 }} disabled={busy || !password}>
+          <SealIcon size={15} /> {busy ? 'Opening…' : 'Open the chamber'}
         </button>
       </div>
-      <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)', marginTop: 12 }}>
-        Signing in with your password marks this device as trusted — next time your PIN is enough.
+      <p className="hint" style={{ marginTop: 14, marginBottom: 0, fontSize: '0.78rem', color: 'var(--rime-3)' }}>
+        Signing in with your password trusts this device — after that your code is enough.
       </p>
     </form>
   );
 }
 
-function UserForm({ title, cta, onSubmit, onBack, requirePin }: {
+function UserForm({ title, note, cta, onSubmit, onBack }: {
   title: string;
+  note: string;
   cta: string;
-  requirePin?: boolean;
   onBack?: () => void;
   onSubmit: (v: { username: string; displayName: string; password: string; pin?: string }) => Promise<void>;
 }) {
@@ -219,8 +248,11 @@ function UserForm({ title, cta, onSubmit, onBack, requirePin }: {
   };
 
   return (
-    <form onSubmit={submit} style={{ width: 320 }}>
-      <h2 style={{ textAlign: 'center', marginBottom: 18 }}>{title}</h2>
+    <form onSubmit={submit} style={{ width: 'min(350px, 90vw)' }}>
+      <div className="portal-heading" style={{ marginBottom: 22 }}>
+        <h2>{title}</h2>
+        <span className="reg reg-sm">{note}</span>
+      </div>
       <div className="field">
         <label htmlFor="un">Username</label>
         <input id="un" className="input" value={v.username} autoComplete="off"
@@ -228,23 +260,26 @@ function UserForm({ title, cta, onSubmit, onBack, requirePin }: {
       </div>
       <div className="field">
         <label htmlFor="dn">Display name</label>
-        <input id="dn" className="input" value={v.displayName} placeholder={v.username}
+        <input id="dn" className="input" value={v.displayName} placeholder={v.username || 'shown on your plate'}
           onChange={(e) => setV({ ...v, displayName: e.target.value })} />
       </div>
       <div className="field">
         <label htmlFor="pw2">Password</label>
         <input id="pw2" className="input" type="password" value={v.password} autoComplete="new-password"
           onChange={(e) => setV({ ...v, password: e.target.value })} />
+        <span className="hint">At least 6 characters.</span>
       </div>
       <div className="field">
-        <label htmlFor="pin">PIN (4-6 digits{requirePin ? '' : ', optional'}) — quick unlock on trusted devices</label>
-        <input id="pin" className="input" inputMode="numeric" pattern="\d*" maxLength={6} value={v.pin}
+        <label htmlFor="pin">Quick code — optional</label>
+        <input id="pin" className="input num" inputMode="numeric" pattern="\d*" maxLength={6} value={v.pin}
+          placeholder="4 to 6 digits"
           onChange={(e) => setV({ ...v, pin: e.target.value.replace(/\D/g, '') })} />
+        <span className="hint">Unlocks the chamber on devices you already trust.</span>
       </div>
-      {error && <div style={{ color: 'var(--danger)', marginBottom: 10, fontWeight: 550 }}>{error}</div>}
-      <div style={{ display: 'flex', gap: 10 }}>
-        {onBack && <button type="button" className="btn btn-ghost" onClick={onBack}>Back</button>}
-        <button className="btn btn-primary" style={{ flex: 1 }} disabled={busy || !v.username || !v.password}>
+      {error && <div className="form-error" role="alert"><AlarmIcon size={15} /> {error}</div>}
+      <div style={{ display: 'flex', gap: 9 }}>
+        {onBack && <button type="button" className="btn btn-quiet" onClick={onBack}>Back</button>}
+        <button className="btn btn-portal" style={{ flex: 1 }} disabled={busy || !v.username || !v.password}>
           {busy ? 'Working…' : cta}
         </button>
       </div>
@@ -255,8 +290,9 @@ function UserForm({ title, cta, onSubmit, onBack, requirePin }: {
 function SetupForm({ onDone }: { onDone: (u: PublicUser) => void }) {
   return (
     <UserForm
-      title="Set up your MiniCloud"
-      cta="Create owner profile"
+      title="Cut the first chamber"
+      note="You are the keyholder — this profile owns the vault"
+      cta="Open the vault"
       onSubmit={async (v) => {
         const r = await api<{ user: PublicUser }>('/auth/setup', { method: 'POST', body: JSON.stringify(v) });
         onDone(r.user);
@@ -268,8 +304,9 @@ function SetupForm({ onDone }: { onDone: (u: PublicUser) => void }) {
 function AddUserForm({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
   return (
     <UserForm
-      title="New profile"
-      cta="Add profile"
+      title="New depositor"
+      note="Their shelves stay separate from yours"
+      cta="Cut their chamber"
       onBack={onBack}
       onSubmit={async (v) => {
         // adding a profile requires someone signed in; the API enforces it

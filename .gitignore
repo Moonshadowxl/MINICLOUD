@@ -11,3 +11,6 @@ e2e-shots/
 
 .env
 .env.*
+
+# design review screenshots (large, regenerated on demand)
+shots/
